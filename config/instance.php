@@ -5,6 +5,14 @@ declare(strict_types=1);
 return [
     'self_hosted' => env('SELF_HOSTED', false),
 
+    /*
+     * Allows DefaultUserSeeder to run outside local/testing. It creates a
+     * pre-verified instance owner with a known password, so this must stay
+     * false anywhere real users exist; it is only for throwaway demo
+     * instances.
+     */
+    'allow_default_user_seed' => (bool) env('ALLOW_DEFAULT_USER_SEED', false),
+
     'community' => [
         'repo' => env('SHOUTRRR_GITHUB_REPO', 'coollabsio/shoutrrr'),
         'sponsor_url' => env('SHOUTRRR_SPONSOR_URL', 'https://github.com/sponsors/coollabsio'),

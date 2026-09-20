@@ -18,15 +18,11 @@ test('the default user seeder refuses to run outside local and testing', functio
 
 test('the default user seeder can be forced with an explicit opt-in', function () {
     app()->detectEnvironment(fn (): string => 'production');
-    putenv('ALLOW_DEFAULT_USER_SEED=true');
+    config(['instance.allow_default_user_seed' => true]);
 
-    try {
-        (new DefaultUserSeeder)->run();
+    (new DefaultUserSeeder)->run();
 
-        expect(User::query()->where('email', 'test@example.com')->exists())->toBeTrue();
-    } finally {
-        putenv('ALLOW_DEFAULT_USER_SEED');
-    }
+    expect(User::query()->where('email', 'test@example.com')->exists())->toBeTrue();
 });
 
 test('the default user seeder still seeds in the testing environment', function () {
