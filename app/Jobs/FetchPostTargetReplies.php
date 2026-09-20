@@ -132,7 +132,7 @@ class FetchPostTargetReplies implements ReleasableJob, ShouldBeUnique, ShouldQue
                 ])->save();
             }
 
-            $this->logFetchOutcome($target->platform->value, $account->id, $scope, $result->status->value, 0, $result->retryAfterSeconds);
+            $this->logFetchOutcome($target->platform->value, $account->id, $scope, $result->status->value, 0, $result->retryAfterSeconds, $result->message);
 
             return;
         }

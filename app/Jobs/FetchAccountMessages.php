@@ -98,14 +98,14 @@ class FetchAccountMessages implements ReleasableJob, ShouldBeUnique, ShouldQueue
         );
 
         if ($result->status === EngagementStatus::RateLimited) {
-            $this->logFetchOutcome($account->platform->value, $account->id, 'dm', 'rate_limited', 0, $result->retryAfterSeconds);
+            $this->logFetchOutcome($account->platform->value, $account->id, 'dm', 'rate_limited', 0, $result->retryAfterSeconds, $result->excerpt);
             $this->release($this->parkForMessageRateLimit($account, $result->retryAfterSeconds));
 
             return;
         }
 
         if (! $result->isOk()) {
-            $this->logFetchOutcome($account->platform->value, $account->id, 'dm', $result->status->value);
+            $this->logFetchOutcome($account->platform->value, $account->id, 'dm', $result->status->value, 0, null, $result->excerpt);
 
             return;
         }

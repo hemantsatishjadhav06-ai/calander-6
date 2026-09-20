@@ -149,7 +149,8 @@ export default function Register({
 }
 
 Register.layout = {
-    title: 'Create an account',
-    description: 'Enter your details below to create your account',
+    title: 'Create your account',
+    description:
+        'Schedule and publish to every social account your team runs, from one place.',
     brandText: 'SM Manager',
 };

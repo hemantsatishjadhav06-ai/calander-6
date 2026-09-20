@@ -17,6 +17,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Description
+    |--------------------------------------------------------------------------
+    |
+    | Used for the meta description and the Open Graph / Twitter card copy on
+    | the HTML shell, so a link to this instance previews with real text
+    | instead of a bare URL. Self-hosters can override it per deployment.
+    |
+    */
+
+    'tagline' => env('APP_TAGLINE', 'Write once, publish everywhere'),
+
+    'description' => env('APP_DESCRIPTION', 'Write once, publish everywhere. Schedule and publish to X, Bluesky, LinkedIn, Instagram, Facebook and Threads from one calendar.'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Version
     |--------------------------------------------------------------------------
     |

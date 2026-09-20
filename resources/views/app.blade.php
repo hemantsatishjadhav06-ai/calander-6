@@ -5,6 +5,23 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
+        {{-- Default SEO / social-preview metadata. Per-page Inertia <Head> tags
+             (e.g. the share page's noindex) are managed separately and win. --}}
+        <meta name="description" content="{{ config('app.description') }}">
+        <link rel="canonical" href="{{ url()->current() }}">
+
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="{{ config('app.name') }}">
+        <meta property="og:title" content="{{ config('app.name') }} — {{ config('app.tagline') }}">
+        <meta property="og:description" content="{{ config('app.description') }}">
+        <meta property="og:url" content="{{ url()->current() }}">
+        <meta property="og:image" content="{{ rtrim((string) config('app.url'), '/') }}/android-chrome-512x512.png">
+
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:title" content="{{ config('app.name') }} — {{ config('app.tagline') }}">
+        <meta name="twitter:description" content="{{ config('app.description') }}">
+        <meta name="twitter:image" content="{{ rtrim((string) config('app.url'), '/') }}/android-chrome-512x512.png">
+
         @if (config('sentry-browser.dsn'))
             {{-- Browser Sentry config, delivered at runtime so a prebuilt bundle
                  can be pointed at a DSN via env. The DSN is a public value. --}}
@@ -53,7 +70,7 @@
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         <x-inertia::head>
-            <title>{{ config('app.name', 'Laravel') }}</title>
+            <title>{{ config('app.name', 'SM Manager') }}</title>
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">
