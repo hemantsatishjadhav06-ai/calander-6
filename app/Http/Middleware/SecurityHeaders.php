@@ -81,7 +81,13 @@ class SecurityHeaders
         $media = trim($media.' '.implode(' ', $this->klipyOrigins()));
         $directives = [
             "default-src 'self'",
-            "script-src 'self' 'nonce-{$nonce}' 'strict-dynamic'",
+            // Keep 'self' alongside the per-request nonce and DROP 'strict-dynamic':
+            // with 'strict-dynamic' the browser ignores 'self' and trusts only
+            // nonce-carrying scripts, so if any Vite-built module tag renders
+            // without the nonce (observed under Octane) every script is blocked and
+            // the Inertia app never mounts — a blank white page on a 200 response.
+            // 'self' guarantees the same-origin /build/*.js bundle always loads.
+            "script-src 'self' 'nonce-{$nonce}'",
             // 'unsafe-inline' is required for React inline style attributes and the
             // <style> element recharts injects at runtime; style injection is a low
             // XSS risk and script-src remains strict.
