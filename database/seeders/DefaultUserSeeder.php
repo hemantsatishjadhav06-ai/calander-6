@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class DefaultUserSeeder extends Seeder
 {
@@ -25,12 +26,13 @@ class DefaultUserSeeder extends Seeder
     public function run(): void
     {
         if (! app()->environment('local', 'testing') && ! config('instance.allow_default_user_seed')) {
-            if (isset($this->command)) {
-                $this->command->warn(
-                    'DefaultUserSeeder skipped: it creates a known-password instance owner and must not run outside local/testing. '
-                    .'Set ALLOW_DEFAULT_USER_SEED=true to override.'
-                );
-            }
+            // Logged rather than written to the console: this runs from deploy
+            // pre-commands where there is no command instance, and the deploy
+            // log is where an operator would look for it.
+            Log::warning(
+                'DefaultUserSeeder skipped: it creates a known-password instance owner and must not run outside local/testing. '
+                .'Set ALLOW_DEFAULT_USER_SEED=true to override.'
+            );
 
             return;
         }
