@@ -28,7 +28,7 @@ export function SidebarFooterCard() {
         return (
             <div className="rounded-md border border-sidebar-border p-2 group-data-[collapsible=icon]:hidden">
                 <p className="text-xs font-medium text-sidebar-foreground">
-                    Shoutrrr Cloud
+                    SM Manager Cloud
                 </p>
                 <p className="text-[11px] text-sidebar-foreground/60">
                     Free plan

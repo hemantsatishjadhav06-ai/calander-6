@@ -7,7 +7,7 @@ const readSource = (file: string) =>
     readFileSync(resolve(process.cwd(), file), 'utf8');
 
 describe('auth logo brand text', () => {
-    it('shows Shoutrrr next to the logo when requested by login and register pages', () => {
+    it('shows SM Manager next to the logo when requested by login and register pages', () => {
         const layout = readSource(
             'resources/js/layouts/auth/auth-simple-layout.tsx',
         );
@@ -17,7 +17,7 @@ describe('auth logo brand text', () => {
         expect(layout).toContain('brandText');
         expect(layout).toContain('{brandText && (');
         expect(layout).toContain('{brandText}');
-        expect(login).toContain("brandText: 'Shoutrrr'");
-        expect(register).toContain("brandText: 'Shoutrrr'");
+        expect(login).toContain("brandText: 'SM Manager'");
+        expect(register).toContain("brandText: 'SM Manager'");
     });
 });

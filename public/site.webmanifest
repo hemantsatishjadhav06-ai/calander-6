@@ -1,6 +1,6 @@
 {
-  "name": "shoutrrr",
-  "short_name": "shoutrrr",
+  "name": "SM Manager",
+  "short_name": "SM Manager",
   "description": "Self-hosted social media scheduler.",
   "start_url": "/",
   "scope": "/",

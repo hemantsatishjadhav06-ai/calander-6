@@ -26,8 +26,8 @@ export default function McpLanding() {
                         Hey there! This one's for the robots 🤖
                     </h1>
                     <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-muted-foreground sm:text-base">
-                        You've found the Shoutrrr Model Context Protocol (MCP)
-                        endpoint. It's how AI agents talk to Shoutrrr, so
+                        You've found the SM Manager Model Context Protocol (MCP)
+                        endpoint. It's how AI agents talk to SM Manager, so
                         there's not much to see in a browser — but you're in the
                         right place if you're setting one up.
                     </p>
@@ -61,7 +61,7 @@ export default function McpLanding() {
                             render={<Link href={home().url} />}
                         >
                             <Home />
-                            Back to Shoutrrr
+                            Back to SM Manager
                         </Button>
                     </div>
                 </div>

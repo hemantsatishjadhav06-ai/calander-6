@@ -100,7 +100,7 @@ it('consolidates open targets into an Open in dropdown', () => {
     expect(source).toContain('Open in');
     expect(source).toContain('Open comment on {platformName}');
     expect(source).toContain('Open post on {platformName}');
-    expect(source).toContain('Open in Shoutrrr');
+    expect(source).toContain('Open in SM Manager');
     expect(source).toContain('commentOnPlatformUrl');
     expect(source).toContain('postOnPlatformUrl');
     expect(source).toContain('postInShoutrrrUrl');

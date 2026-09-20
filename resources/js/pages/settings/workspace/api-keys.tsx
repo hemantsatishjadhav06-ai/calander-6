@@ -159,7 +159,7 @@ export default function ApiKeys({ apiKeys }: Props) {
                     <CardHeader>
                         <CardTitle>API keys</CardTitle>
                         <CardDescription>
-                            Call the Shoutrrr API from scripts, cron jobs, and
+                            Call the SM Manager API from scripts, cron jobs, and
                             integrations. Each key acts on this workspace only.
                         </CardDescription>
                         {apiKeys.length > 0 && (

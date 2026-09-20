@@ -76,7 +76,7 @@ it('publishes a web app manifest using the generated icons', function (): void {
     $manifest = json_decode(file_get_contents(public_path('site.webmanifest')), true, flags: JSON_THROW_ON_ERROR);
 
     expect($manifest)
-        ->toHaveKey('name', 'shoutrrr')
+        ->toHaveKey('name', 'SM Manager')
         ->toHaveKey('theme_color', '#101010');
 
     expect(collect($manifest['icons'])->pluck('src')->all())->toEqual([

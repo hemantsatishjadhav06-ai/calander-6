@@ -52,7 +52,7 @@ return [
     ],
 
     'ui' => [
-        'title' => 'Shoutrrr API',
+        'title' => 'SM Manager API',
     ],
 
     'renderer' => 'elements',

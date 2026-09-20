@@ -111,7 +111,7 @@ export function WelcomeModal({ welcomed }: { welcomed: boolean }) {
                     <DialogTitle>
                         Welcome to{' '}
                         <span className="bg-gradient-to-br from-[color-mix(in_oklch,var(--primary)_70%,black)] to-[color-mix(in_oklch,var(--primary)_48%,black)] bg-clip-text text-transparent dark:from-primary dark:to-[color-mix(in_oklch,var(--primary)_65%,white)]">
-                            Shoutrrr
+                            SM Manager
                         </span>
                     </DialogTitle>
                     <DialogDescription>
