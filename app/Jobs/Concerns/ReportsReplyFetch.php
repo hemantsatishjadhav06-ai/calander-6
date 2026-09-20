@@ -46,6 +46,12 @@ trait ReportsReplyFetch
         return $seconds;
     }
 
+    /**
+     * @param  string|null  $detail  The platform's error excerpt. Without it a
+     *                               non-ok outcome is undiagnosable: the status
+     *                               alone ("failed") says nothing about which
+     *                               HTTP code or API error caused it.
+     */
     protected function logFetchOutcome(
         string $platform,
         string $accountId,
@@ -53,14 +59,21 @@ trait ReportsReplyFetch
         string $outcome,
         int $inserted = 0,
         ?int $retryAfter = null,
+        ?string $detail = null,
     ): void {
-        Log::info('engagement.fetch', [
+        $context = [
             'platform' => $platform,
             'account_id' => $accountId,
             'scope' => $scope,
             'outcome' => $outcome,
             'inserted' => $inserted,
             'retry_after' => $retryAfter,
-        ]);
+        ];
+
+        if ($detail !== null && $detail !== '') {
+            $context['detail'] = $detail;
+        }
+
+        Log::info('engagement.fetch', $context);
     }
 }

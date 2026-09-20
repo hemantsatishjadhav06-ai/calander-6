@@ -20,7 +20,7 @@ import InstanceSettingsLayout from '@/layouts/settings/instance-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import WorkspaceSettingsLayout from '@/layouts/settings/workspace-layout';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Shoutrrr';
+const appName = import.meta.env.VITE_APP_NAME || 'SM Manager';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

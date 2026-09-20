@@ -153,7 +153,7 @@ class FetchAccountReplies implements ReleasableJob, ShouldBeUnique, ShouldQueue
                     return;
                 }
 
-                $this->logFetchOutcome($account->platform->value, $account->id, "target:{$target->id}", $result->status->value, 0, $result->retryAfterSeconds);
+                $this->logFetchOutcome($account->platform->value, $account->id, "target:{$target->id}", $result->status->value, 0, $result->retryAfterSeconds, $result->message);
 
                 continue;
             }

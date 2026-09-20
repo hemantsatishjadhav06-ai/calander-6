@@ -35,13 +35,21 @@ class DashboardController extends Controller
                     ->map(fn (WorkspaceMention $mention): array => WorkspaceMentionController::view($mention))
                     ->all()
                 : [],
-            'posts' => Inertia::defer(fn (): array => Post::query()
-                ->with(['author:id,name', 'targets', 'media'])
-                ->latest('updated_at')
-                ->limit(25)
-                ->get()
-                ->map(fn (Post $post): array => PostListItem::make($post))
-                ->all()),
+            // Scope explicitly rather than leaning on the workspace global
+            // scope: that scope is a no-op when no workspace context is set
+            // (a user who left their last workspace has a null
+            // current_workspace_id), which would surface every tenant's posts.
+            'posts' => Inertia::defer(fn (): array => $user?->current_workspace_id
+                ? Post::query()
+                    ->withoutGlobalScopes()
+                    ->where('workspace_id', $user->current_workspace_id)
+                    ->with(['author:id,name', 'targets', 'media'])
+                    ->latest('updated_at')
+                    ->limit(25)
+                    ->get()
+                    ->map(fn (Post $post): array => PostListItem::make($post))
+                    ->all()
+                : []),
         ]);
     }
 }

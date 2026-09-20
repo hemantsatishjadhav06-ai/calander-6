@@ -38,6 +38,13 @@ class EngagementController extends Controller
 {
     public function index(Request $request, InstanceSettings $settings): InertiaResponse
     {
+        // The workspace global scope is a no-op without workspace context, so a
+        // user whose current_workspace_id is null (they left their last
+        // workspace) would otherwise read every tenant's accounts and posts.
+        $workspaceId = $request->user()?->current_workspace_id;
+
+        abort_unless(is_string($workspaceId) && $workspaceId !== '', 403);
+
         $account = $request->string('account')->toString();
         $platform = $request->string('platform')->toString();
         $target = $request->string('target')->toString();
@@ -61,7 +68,10 @@ class EngagementController extends Controller
             ->when($account !== '', fn ($q) => $q->whereHas('target',
                 fn ($t) => $t->where('connected_account_id', $account)));
 
-        $accounts = ConnectedAccount::query()->get(['id', 'handle', 'platform'])
+        $accounts = ConnectedAccount::query()
+            ->withoutGlobalScopes()
+            ->where('workspace_id', $workspaceId)
+            ->get(['id', 'handle', 'platform'])
             ->map(fn (ConnectedAccount $a): array => [
                 'id' => $a->id,
                 'handle' => $a->handle,
@@ -77,6 +87,8 @@ class EngagementController extends Controller
             ->where('post_target_replies.status', '!=', ReplyStatus::Archived->value);
 
         $posts = Post::query()
+            ->withoutGlobalScopes()
+            ->where('workspace_id', $workspaceId)
             ->whereHas('replies', $liveReplies)
             ->withCount(['replies as reply_count' => $liveReplies])
             ->orderByDesc('reply_count')
@@ -112,7 +124,7 @@ class EngagementController extends Controller
             // The reply box reuses the composer's @-mention picker, so it needs
             // the same saved-mention library the composer receives.
             'savedMentions' => WorkspaceMention::withoutGlobalScopes()
-                ->where('workspace_id', $request->user()->current_workspace_id)
+                ->where('workspace_id', $workspaceId)
                 ->orderBy('name')
                 ->get()
                 ->map(fn (WorkspaceMention $mention): array => WorkspaceMentionController::view($mention))

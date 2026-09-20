@@ -26,7 +26,10 @@ test('responses carry a nonce-based content security policy', function () {
         ->and($csp)->toContain("media-src 'self' blob:")
         ->and($csp)->toContain("connect-src 'self' blob:")
         ->and($csp)->toMatch("/script-src [^;]*'nonce-[A-Za-z0-9+\/=]+'/")
-        ->and($csp)->toContain("'strict-dynamic'");
+        // 'strict-dynamic' is deliberately omitted: it makes the browser ignore
+        // the 'self' host allowlist, which blocked the Inertia bundle and left a
+        // white screen. See SecurityHeaders::contentSecurityPolicy().
+        ->and($csp)->not->toContain("'strict-dynamic'");
 });
 
 test('forms may redirect to https services and the cursor mcp oauth loopback', function () {

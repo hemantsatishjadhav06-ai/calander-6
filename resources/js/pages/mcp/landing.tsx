@@ -2,10 +2,8 @@ import { Head, Link } from '@inertiajs/react';
 
 import AppLogoIcon from '@/components/layout/app-logo-icon';
 import { Button } from '@/components/ui/button';
-import { ArrowUpRight, BookText, Bot, Home } from '@/components/ui/icons';
+import { Bot, Home } from '@/components/ui/icons';
 import { home } from '@/routes';
-
-const DOCS_URL = 'https://shoutrrr.com/docs/mcp';
 
 export default function McpLanding() {
     return (
@@ -26,8 +24,8 @@ export default function McpLanding() {
                         Hey there! This one's for the robots 🤖
                     </h1>
                     <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-muted-foreground sm:text-base">
-                        You've found the Shoutrrr Model Context Protocol (MCP)
-                        endpoint. It's how AI agents talk to Shoutrrr, so
+                        You've found the SM Manager Model Context Protocol (MCP)
+                        endpoint. It's how AI agents talk to SM Manager, so
                         there's not much to see in a browser — but you're in the
                         right place if you're setting one up.
                     </p>
@@ -40,7 +38,7 @@ export default function McpLanding() {
                                 POST
                             </code>{' '}
                             requests here and completing a quick OAuth
-                            handshake. The docs walk you through it.
+                            handshake.
                         </p>
                     </div>
 
@@ -48,20 +46,10 @@ export default function McpLanding() {
                         <Button
                             nativeButton={false}
                             size="lg"
-                            render={<a href={DOCS_URL} />}
-                        >
-                            <BookText />
-                            Read the MCP docs
-                            <ArrowUpRight />
-                        </Button>
-                        <Button
-                            nativeButton={false}
-                            variant="outline"
-                            size="lg"
                             render={<Link href={home().url} />}
                         >
                             <Home />
-                            Back to Shoutrrr
+                            Back to SM Manager
                         </Button>
                     </div>
                 </div>

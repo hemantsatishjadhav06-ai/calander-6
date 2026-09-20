@@ -20,7 +20,7 @@ class BlueskyClientMetadataController extends Controller
         return response()->json([
             'client_id' => $clientId,
             'application_type' => 'web',
-            'client_name' => config('app.name', 'Shoutrrr'),
+            'client_name' => config('app.name', 'SM Manager'),
             'client_uri' => url('/'),
             'grant_types' => ['authorization_code', 'refresh_token'],
             'scope' => BlueskyOAuthConnector::SCOPE,

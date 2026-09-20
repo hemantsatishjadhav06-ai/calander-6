@@ -536,7 +536,7 @@ function RightPane({
                                 <DropdownMenuItem
                                     render={<Link href={postInShoutrrrUrl} />}
                                 >
-                                    Open in Shoutrrr
+                                    Open in SM Manager
                                 </DropdownMenuItem>
                             ) : null}
                         </DropdownMenuContent>

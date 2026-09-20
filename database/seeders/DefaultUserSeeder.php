@@ -8,14 +8,35 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class DefaultUserSeeder extends Seeder
 {
     /**
      * Seed the default development user and workspace.
+     *
+     * Refuses to run outside local/testing. This seeder creates a known
+     * instance-OWNER login (test@example.com / "password", pre-verified), so
+     * running it on a deployed instance publishes an admin backdoor. It is
+     * called directly (composer dev, docker-compose.dev, and some deploy
+     * pre-commands) which bypasses DatabaseSeeder's isLocal() guard, so the
+     * guard has to live here. Set ALLOW_DEFAULT_USER_SEED=true to override
+     * deliberately (e.g. seeding a throwaway demo instance).
      */
     public function run(): void
     {
+        if (! app()->environment('local', 'testing') && ! config('instance.allow_default_user_seed')) {
+            // Logged rather than written to the console: this runs from deploy
+            // pre-commands where there is no command instance, and the deploy
+            // log is where an operator would look for it.
+            Log::warning(
+                'DefaultUserSeeder skipped: it creates a known-password instance owner and must not run outside local/testing. '
+                .'Set ALLOW_DEFAULT_USER_SEED=true to override.'
+            );
+
+            return;
+        }
+
         $user = User::query()->firstOrCreate(
             ['email' => 'test@example.com'],
             [

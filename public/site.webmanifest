@@ -1,7 +1,7 @@
 {
-  "name": "shoutrrr",
-  "short_name": "shoutrrr",
-  "description": "Self-hosted social media scheduler.",
+  "name": "SM Manager",
+  "short_name": "SM Manager",
+  "description": "Write once, publish everywhere. Schedule and publish to X, Bluesky, LinkedIn and more from one calendar.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

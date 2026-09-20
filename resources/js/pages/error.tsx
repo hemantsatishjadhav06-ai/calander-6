@@ -41,7 +41,7 @@ const errorCopy: Record<
     503: {
         title: 'Temporarily unavailable',
         description:
-            'Shoutrrr is briefly unavailable while we perform maintenance or recover capacity.',
+            'SM Manager is briefly unavailable while we perform maintenance or recover capacity.',
     },
 };
 

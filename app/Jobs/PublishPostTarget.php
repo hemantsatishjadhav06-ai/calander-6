@@ -138,7 +138,7 @@ class PublishPostTarget implements ShouldQueue
         if (! $subscriptions->canPublish($workspace)) {
             $result = PublishResult::failure(
                 ErrorKind::BillingRequired,
-                'An active Shoutrrr subscription is required to publish posts.',
+                'An active SM Manager subscription is required to publish posts.',
             );
         } elseif ($target->platform === Platform::X && ! $subscriptions->canPublishX($workspace)) {
             $result = PublishResult::failure(
