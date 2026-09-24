@@ -97,6 +97,8 @@ export default function WorkspaceOverview({
         <>
             <Head title="Workspace settings" />
 
+            <h1 className="sr-only">Workspace settings</h1>
+
             <div className="space-y-6">
                 <Heading
                     variant="small"

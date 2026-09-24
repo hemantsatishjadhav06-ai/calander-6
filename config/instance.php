@@ -13,9 +13,17 @@ return [
      */
     'allow_default_user_seed' => (bool) env('ALLOW_DEFAULT_USER_SEED', false),
 
+    /*
+     * Community links shown in the sidebar footer. These default to this
+     * product's own repository — they previously pointed at the upstream
+     * project this was forked from, which asked our users to star and
+     * financially sponsor a different organisation. `sponsor_url` is empty by
+     * default: sponsorship is opt-in, and an unset link is hidden rather than
+     * pointed at someone.
+     */
     'community' => [
-        'repo' => env('SHOUTRRR_GITHUB_REPO', 'coollabsio/shoutrrr'),
-        'sponsor_url' => env('SHOUTRRR_SPONSOR_URL', 'https://github.com/sponsors/coollabsio'),
+        'repo' => env('INSTANCE_GITHUB_REPO', 'hemantsatishjadhav06-ai/calander-6'),
+        'sponsor_url' => env('INSTANCE_SPONSOR_URL', ''),
     ],
 
     'defaults' => [

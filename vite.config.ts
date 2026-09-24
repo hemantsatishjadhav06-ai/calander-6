@@ -99,6 +99,11 @@ export default defineConfig(({ mode }) => {
         // not need a committed VERSION file. See resolve-app-version.ts.
         define: {
             __APP_VERSION__: JSON.stringify(resolveAppVersion()),
+            // Release links point at this product's own repository. Override
+            // with APP_GITHUB_REPO when building a fork.
+            __GITHUB_REPO__: JSON.stringify(
+                environment.APP_GITHUB_REPO || 'hemantsatishjadhav06-ai/calander-6',
+            ),
         },
         server: {
             // Listen on all interfaces so LAN / hostname access works.

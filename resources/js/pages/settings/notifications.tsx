@@ -119,6 +119,7 @@ export default function Notifications() {
                                         <div className="flex justify-center">
                                             <Checkbox
                                                 id={`${event.key}-in_app`}
+                                                aria-label={`In-app notifications for ${event.label}`}
                                                 checked={
                                                     isAlwaysOn
                                                         ? true
@@ -145,6 +146,7 @@ export default function Notifications() {
                                         <div className="flex justify-center">
                                             <Checkbox
                                                 id={`${event.key}-mail`}
+                                                aria-label={`Email notifications for ${event.label}`}
                                                 checked={row.mail}
                                                 onCheckedChange={(checked) => {
                                                     toggleChannel(

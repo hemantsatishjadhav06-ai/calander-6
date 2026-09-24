@@ -167,6 +167,8 @@ export default function PostsIndex({ posts, filters, sets, counts }: Props) {
         <>
             <Head title="Posts" />
 
+            <h1 className="sr-only">Posts</h1>
+
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-0">
                 {/* Command bar */}
                 <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -179,6 +181,7 @@ export default function PostsIndex({ posts, filters, sets, counts }: Props) {
                         <Search className="pointer-events-none absolute inset-y-0 left-2.5 my-auto size-3.5 text-muted-foreground" />
                         <Input
                             placeholder="Search posts…"
+                            aria-label="Search posts"
                             value={localQ}
                             onChange={(e) => handleQChange(e.target.value)}
                             className="h-8 pr-7 pl-8 text-sm"

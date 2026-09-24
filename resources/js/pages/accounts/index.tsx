@@ -154,6 +154,8 @@ export default function ConnectedAccounts({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-16 sm:px-6">
             <Head title="Accounts" />
 
+            <h1 className="sr-only">Connected accounts</h1>
+
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <Heading
                     title="Connected accounts"
