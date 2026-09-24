@@ -110,3 +110,25 @@ test('a second demo email gets a workspace of its own', function () {
         ->and(Workspace::query()->pluck('slug')->sort()->values()->all())
         ->toEqual(['demo', 'demo-2']);
 });
+
+/**
+ * Some hosts run a deploy pre-command in a container whose stdout never reaches
+ * the log, so a generated password printed there is simply lost.
+ */
+test('it accepts a supplied password instead of generating one', function () {
+    $this->artisan('demo:create', ['--password' => 'SuppliedPassword123'])->assertSuccessful();
+
+    $user = User::query()->where('email', 'demo@example.com')->firstOrFail();
+
+    expect(Hash::check('SuppliedPassword123', $user->password))->toBeTrue();
+});
+
+test('it rejects a supplied password that is too short and changes nothing', function () {
+    $this->artisan('demo:create')->assertSuccessful();
+    $before = User::query()->where('email', 'demo@example.com')->firstOrFail()->password;
+
+    $this->artisan('demo:create', ['--password' => 'short'])->assertFailed();
+
+    expect(User::query()->where('email', 'demo@example.com')->firstOrFail()->password)
+        ->toBe($before);
+});
