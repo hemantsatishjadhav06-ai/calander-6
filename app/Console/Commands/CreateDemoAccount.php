@@ -126,7 +126,10 @@ class CreateDemoAccount extends Command
         // Pre-verified on purpose: a demo login is handed out to people who
         // cannot read that inbox, so an unverified one would dead-end at the
         // verification notice.
-        $user->email_verified_at ??= now();
+        if ($user->email_verified_at === null) {
+            $user->forceFill(['email_verified_at' => now()]);
+        }
+
         $user->save();
 
         // Keyed on the owner rather than a fixed slug, so a second `--email`

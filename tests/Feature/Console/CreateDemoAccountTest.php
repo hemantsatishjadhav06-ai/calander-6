@@ -32,8 +32,11 @@ test('it provisions a demo user in its own workspace with sample posts', functio
         ->get();
 
     expect($posts)->toHaveCount(4)
-        ->and($posts->pluck('status')->unique()->sort()->values()->all())
-        ->toEqual([PostStatus::Draft, PostStatus::Scheduled]);
+        ->and($posts->where('status', PostStatus::Draft))->toHaveCount(2)
+        ->and($posts->where('status', PostStatus::Scheduled))->toHaveCount(2)
+        ->and($posts->where('status', PostStatus::Scheduled)->every(
+            fn ($post): bool => $post->scheduled_at?->isFuture() === true
+        ))->toBeTrue();
 });
 
 /**
