@@ -525,6 +525,8 @@ export default function MessagesIndex({ conversations, filters }: PageProps) {
         <>
             <Head title="Messages" />
 
+            <h1 className="sr-only">Direct messages</h1>
+
             {/*
               Fill the viewport below the sticky app header (h-16) so each
               column owns its own scroll and the message box stays pinned. On

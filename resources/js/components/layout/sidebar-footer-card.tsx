@@ -64,15 +64,17 @@ export function SidebarFooterCard() {
                     </span>
                 )}
             </a>
-            <a
-                href={community.sponsorUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            >
-                <Heart className="h-4 w-4" aria-hidden="true" />
-                <span>Sponsor</span>
-            </a>
+            {community.sponsorUrl && (
+                <a
+                    href={community.sponsorUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                >
+                    <Heart className="h-4 w-4" aria-hidden="true" />
+                    <span>Sponsor</span>
+                </a>
+            )}
         </div>
     );
 }

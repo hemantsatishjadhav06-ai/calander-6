@@ -119,6 +119,8 @@ export default function InstancePolling({ settings, sections }: Props) {
         <>
             <Head title="Instance polling" />
 
+            <h1 className="sr-only">Instance polling</h1>
+
             <div className="space-y-6">
                 <Heading
                     variant="small"
@@ -384,6 +386,10 @@ function PollingCard({
                             <div>
                                 <Input
                                     id={`${group}-${p.platform}`}
+                                    // The visible Label is bound to the enable
+                                    // checkbox, so this interval field needs its
+                                    // own accessible name.
+                                    aria-label={`${p.label} polling interval in minutes`}
                                     type="number"
                                     min={5}
                                     max={10080}

@@ -47,4 +47,10 @@ describe('sidebar footer card variants', () => {
         expect(source).toContain('community.sponsorUrl');
         expect(source).toContain('Star on GitHub');
     });
+
+    // Sponsorship is opt-in: with no sponsor_url configured the link is hidden
+    // rather than rendered pointing at whoever the default happened to be.
+    it('hides the sponsor link when no sponsor url is configured', () => {
+        expect(source).toContain('{community.sponsorUrl && (');
+    });
 });

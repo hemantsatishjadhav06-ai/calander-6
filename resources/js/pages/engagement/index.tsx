@@ -842,6 +842,8 @@ export default function EngagementIndex({
         <>
             <Head title="Engagement" />
 
+            <h1 className="sr-only">Engagement inbox</h1>
+
             {/*
               Fill the viewport below the sticky app header (h-16) so each
               column owns its own scroll and the reply box stays pinned. On md+

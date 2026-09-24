@@ -150,6 +150,8 @@ export default function ApiKeys({ apiKeys }: Props) {
         <>
             <Head title="API keys" />
 
+            <h1 className="sr-only">API keys</h1>
+
             <div className="space-y-6">
                 {flash?.plainTextApiKey && (
                     <NewKeyReveal token={flash.plainTextApiKey as string} />

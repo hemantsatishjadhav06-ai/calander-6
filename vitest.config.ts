@@ -7,6 +7,9 @@ import { resolveAppVersion } from './resolve-app-version';
 export default defineConfig({
     define: {
         __APP_VERSION__: JSON.stringify(resolveAppVersion()),
+        __GITHUB_REPO__: JSON.stringify(
+            process.env.APP_GITHUB_REPO || 'hemantsatishjadhav06-ai/calander-6',
+        ),
     },
     plugins: [react()],
     resolve: {

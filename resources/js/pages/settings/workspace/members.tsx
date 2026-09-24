@@ -115,6 +115,8 @@ export default function WorkspaceMembers({
         <>
             <Head title="Workspace members" />
 
+            <h1 className="sr-only">Workspace members</h1>
+
             <div className="space-y-6">
                 <div className="flex items-center justify-between gap-4">
                     <Heading

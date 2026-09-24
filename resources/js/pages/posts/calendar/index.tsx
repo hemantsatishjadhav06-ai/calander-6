@@ -238,6 +238,8 @@ export default function CalendarIndex({ yyyymm, view, posts }: Props) {
         <>
             <Head title="Calendar" />
 
+            <h1 className="sr-only">Calendar</h1>
+
             <div className="mx-auto w-full max-w-6xl px-4 pt-6 pb-16 sm:px-6">
                 <CalendarHeader
                     label={label}

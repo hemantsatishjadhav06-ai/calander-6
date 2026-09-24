@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { appVersion, githubReleaseUrl } from '@/lib/version';
+import { appVersion, githubRepo, githubReleaseUrl } from '@/lib/version';
 
 describe('app version badge', () => {
     it('exposes the app version injected at build time', () => {
@@ -12,7 +12,13 @@ describe('app version badge', () => {
 
     it('links the displayed version to the matching GitHub release', () => {
         expect(githubReleaseUrl).toBe(
-            `https://github.com/coollabsio/shoutrrr/releases/tag/${appVersion}`,
+            `https://github.com/${githubRepo}/releases/tag/${appVersion}`,
         );
+    });
+
+    // Regression: the badge used to hardcode the upstream project this was
+    // forked from, so the version link sent our users to someone else's repo.
+    it('does not link to the upstream project', () => {
+        expect(githubReleaseUrl).not.toContain('coollabsio');
     });
 });
