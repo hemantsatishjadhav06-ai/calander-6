@@ -307,3 +307,22 @@ test('x sendMessage reports a slow transcode as retriable rather than blocking t
     expect($result->excerpt)->toContain('still being processed');
     Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'dm_conversations'));
 });
+
+// X answers 402 "credits depleted" once the app's API quota is spent. That is
+// not a rate limit (it does not clear on a timer) and must not fall through to
+// the generic `failed` branch, which retries on every poll.
+test('x fetch maps 402 credits-depleted to quota exhausted', function () {
+    Http::fake(['api.twitter.com/2/dm_events*' => Http::response([
+        'detail' => 'credits depleted',
+        'status' => 402,
+        'title' => 'Payment Required',
+        'type' => 'https://api.x.com/2/problems/credits-depleted',
+    ], 402)]);
+
+    $account = ConnectedAccount::factory()->create(['platform' => Platform::X]);
+    $result = app(XDirectMessageConnector::class)->fetchConversations($account, ['access_token' => 'tok'], null);
+
+    expect($result->status)->toBe(EngagementStatus::QuotaExhausted);
+    expect($result->isOk())->toBeFalse();
+    expect($result->excerpt)->toContain('credits depleted');
+});

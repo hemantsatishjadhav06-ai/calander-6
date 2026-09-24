@@ -9,6 +9,14 @@ enum EngagementStatus: string
     case Ok = 'ok';
     case Unsupported = 'unsupported';
     case RateLimited = 'rate_limited';
+
+    /**
+     * The platform accepted the credentials but the account has no API quota
+     * left (X answers 402 "credits depleted"). Unlike a rate limit this does not
+     * clear on its own — it needs a plan change — so callers park for far longer
+     * rather than retrying on the normal poll interval.
+     */
+    case QuotaExhausted = 'quota_exhausted';
     case AuthExpired = 'auth_expired';
     case Failed = 'failed';
 
@@ -37,6 +45,7 @@ enum EngagementStatus: string
             self::AuthExpired => 403,
             self::Unsupported => 409,
             self::RateLimited => 429,
+            self::QuotaExhausted => 402,
             self::Failed => 502,
         };
     }

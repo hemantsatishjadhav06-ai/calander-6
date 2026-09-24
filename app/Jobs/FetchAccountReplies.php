@@ -146,6 +146,18 @@ class FetchAccountReplies implements ReleasableJob, ShouldBeUnique, ShouldQueue
             if (! $result->isOk()) {
                 // A rate-limit is account-wide (shared token) — stop the whole batch
                 // and park the account rather than churning the other targets.
+                if ($result->status === EngagementStatus::QuotaExhausted) {
+                    $seconds = max(
+                        (int) ($result->retryAfterSeconds ?? 0),
+                        (int) config('engagement.quota_exhausted_backoff', 21600),
+                    );
+
+                    $this->logFetchOutcome($account->platform->value, $account->id, 'account', $result->status->value, 0, $seconds, $result->message);
+                    $this->release($this->parkForRateLimit($account, $seconds));
+
+                    return;
+                }
+
                 if ($result->status === EngagementStatus::RateLimited) {
                     $this->logFetchOutcome($account->platform->value, $account->id, 'account', 'rate_limited', 0, $result->retryAfterSeconds);
                     $this->release($this->parkForRateLimit($account, $result->retryAfterSeconds));

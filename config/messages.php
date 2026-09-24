@@ -20,6 +20,11 @@ return [
     ],
 
     'default_rate_limit_backoff' => (int) env('MESSAGES_DEFAULT_RATE_LIMIT_BACKOFF', 900),
+
+    // Park duration (seconds) when the platform reports the account's API quota
+    // is spent (X: 402 "credits depleted"). That needs a plan change to clear,
+    // so retrying on the normal interval just burns calls for nothing.
+    'quota_exhausted_backoff' => (int) env('MESSAGES_QUOTA_EXHAUSTED_BACKOFF', 21600),
     'fetch_rate_per_minute' => (int) env('MESSAGES_FETCH_RATE_PER_MINUTE', 12),
 
     // Meta standard messaging window in hours.

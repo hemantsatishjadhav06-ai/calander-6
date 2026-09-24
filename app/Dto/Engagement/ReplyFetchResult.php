@@ -32,6 +32,11 @@ final readonly class ReplyFetchResult
         return new self(EngagementStatus::RateLimited, message: $message, retryAfterSeconds: $retryAfterSeconds);
     }
 
+    public static function quotaExhausted(?string $message = null, ?int $retryAfterSeconds = null): self
+    {
+        return new self(EngagementStatus::QuotaExhausted, message: $message, retryAfterSeconds: $retryAfterSeconds);
+    }
+
     public static function authExpired(?string $message = null): self
     {
         return new self(EngagementStatus::AuthExpired, message: $message);
