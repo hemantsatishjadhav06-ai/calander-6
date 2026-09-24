@@ -282,6 +282,10 @@ class XDirectMessageConnector implements DirectMessageConnector
         return match ($response->status()) {
             401 => ConversationFetchResult::authExpired($this->excerpt($response)),
             403 => ConversationFetchResult::unsupported($this->excerpt($response)),
+            // X returns 402 "credits depleted" when the app's API quota is spent.
+            // It does not clear on its own, so this is parked far longer than a
+            // rate limit instead of retried every poll.
+            402 => ConversationFetchResult::quotaExhausted($this->excerpt($response), RetryAfter::seconds($response)),
             429 => ConversationFetchResult::rateLimited($this->excerpt($response), RetryAfter::seconds($response)),
             default => ConversationFetchResult::failed($this->excerpt($response)),
         };

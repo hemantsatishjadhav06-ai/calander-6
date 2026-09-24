@@ -119,6 +119,13 @@ class FetchPostTargetReplies implements ReleasableJob, ShouldBeUnique, ShouldQue
         );
 
         if (! $result->isOk()) {
+            if ($result->status === EngagementStatus::QuotaExhausted) {
+                $this->release($this->parkForRateLimit($account, max(
+                    (int) ($result->retryAfterSeconds ?? 0),
+                    (int) config('engagement.quota_exhausted_backoff', 21600),
+                )));
+            }
+
             if ($result->status === EngagementStatus::RateLimited) {
                 $this->release($this->parkForRateLimit($account, $result->retryAfterSeconds));
             }

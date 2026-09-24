@@ -37,6 +37,11 @@ return [
     // usable Retry-After / reset header.
     'default_rate_limit_backoff' => (int) env('ENGAGEMENT_DEFAULT_RATE_LIMIT_BACKOFF', 900),
 
+    // Park duration (seconds) when the platform reports the account's API quota
+    // is spent (X: 402 "credits depleted"). That needs a plan change to clear,
+    // so retrying on the normal interval just burns calls for nothing.
+    'quota_exhausted_backoff' => (int) env('ENGAGEMENT_QUOTA_EXHAUSTED_BACKOFF', 21600),
+
     // Max `next_token` pages a single batched reply search will follow per chunk per
     // run, so a viral post can't spin the API indefinitely (each page is one call).
     // At 100 replies/page this admits up to ~500 replies per chunk per run. Recent

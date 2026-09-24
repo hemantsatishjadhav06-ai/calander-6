@@ -97,6 +97,21 @@ class FetchAccountMessages implements ReleasableJob, ShouldBeUnique, ShouldQueue
             $since !== null ? CarbonImmutable::parse($since) : null,
         );
 
+        if ($result->status === EngagementStatus::QuotaExhausted) {
+            // Quota does not refill on a timer, so park well past the poll
+            // interval; never shorter than the configured floor even if the
+            // platform suggested a retry-after.
+            $seconds = max(
+                (int) ($result->retryAfterSeconds ?? 0),
+                (int) config('messages.quota_exhausted_backoff', 21600),
+            );
+
+            $this->logFetchOutcome($account->platform->value, $account->id, 'dm', $result->status->value, 0, $seconds, $result->excerpt);
+            $this->release($this->parkForMessageRateLimit($account, $seconds));
+
+            return;
+        }
+
         if ($result->status === EngagementStatus::RateLimited) {
             $this->logFetchOutcome($account->platform->value, $account->id, 'dm', 'rate_limited', 0, $result->retryAfterSeconds, $result->excerpt);
             $this->release($this->parkForMessageRateLimit($account, $result->retryAfterSeconds));

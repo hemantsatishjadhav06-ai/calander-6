@@ -27,6 +27,11 @@ final readonly class ConversationFetchResult
         return new self(EngagementStatus::RateLimited, retryAfterSeconds: $retryAfter, excerpt: $excerpt);
     }
 
+    public static function quotaExhausted(?string $excerpt, ?int $retryAfter = null): self
+    {
+        return new self(EngagementStatus::QuotaExhausted, retryAfterSeconds: $retryAfter, excerpt: $excerpt);
+    }
+
     public static function authExpired(?string $excerpt): self
     {
         return new self(EngagementStatus::AuthExpired, excerpt: $excerpt);

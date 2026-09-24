@@ -142,7 +142,7 @@ class XEngagementConnector implements BatchEngagementConnector, EngagementConnec
 
                 // Rate-limit / auth failures are account-wide (shared token): stop
                 // hammering the API and propagate to every remaining chunk.
-                if (in_array($failure->status, [EngagementStatus::RateLimited, EngagementStatus::AuthExpired], true)) {
+                if (in_array($failure->status, [EngagementStatus::RateLimited, EngagementStatus::QuotaExhausted, EngagementStatus::AuthExpired], true)) {
                     foreach (array_slice($chunks, $index + 1) as $remaining) {
                         $this->assignToChunk($results, $remaining, $failure);
                     }
@@ -575,6 +575,9 @@ class XEngagementConnector implements BatchEngagementConnector, EngagementConnec
         return match (true) {
             $response->status() === 401 => ReplyFetchResult::authExpired($this->excerpt($response)),
             $response->status() === 403 => ReplyFetchResult::unsupported($this->excerpt($response)),
+            // 402 = "credits depleted": the app's X API quota is spent. Parked
+            // for much longer than a rate limit, which clears by itself.
+            $response->status() === 402 => ReplyFetchResult::quotaExhausted($this->excerpt($response), RetryAfter::seconds($response)),
             $response->status() === 429 => ReplyFetchResult::rateLimited($this->excerpt($response), RetryAfter::seconds($response)),
             default => ReplyFetchResult::failed($this->excerpt($response)),
         };
