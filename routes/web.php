@@ -4,15 +4,21 @@ use App\Http\Controllers\CommandSearchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Gifs\GifBrowserController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\WorkspaceMentionController;
 use App\Http\Middleware\NoIndex;
 use App\Services\Gifs\KlipyClient;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return redirect()->route(auth()->check() ? 'dashboard' : 'login');
-})->name('home');
+Route::get('/', [PublicPageController::class, 'home'])->name('home');
+
+// Reachable without an account on purpose. Google, Meta, X and LinkedIn all
+// require a public privacy policy before approving an OAuth app, and Meta
+// additionally requires a data-deletion URL, so these cannot sit behind auth.
+Route::get('/privacy', [PublicPageController::class, 'privacy'])->name('legal.privacy');
+Route::get('/terms', [PublicPageController::class, 'terms'])->name('legal.terms');
+Route::get('/data-deletion', [PublicPageController::class, 'dataDeletion'])->name('legal.data-deletion');
 
 Route::get('/share/{token}', [PublicShareController::class, 'show'])
     ->middleware([NoIndex::class, 'throttle:30,1'])

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\InstanceRole;
 use App\Enums\SocialProvider;
 use App\Exceptions\SocialAuthException;
 use App\Models\SocialAccount;
@@ -344,4 +345,39 @@ test('login and register pages expose x and linkedin when enabled', function () 
             ->component('auth/login')
             ->where('providers', $expected),
         );
+});
+
+/**
+ * Closing registration has to close the social path too. An instance that
+ * turned sign-ups off but still minted accounts for anyone with a Google login
+ * would not be closed at all.
+ */
+test('social sign-up is refused on an instance with registrations closed', function () {
+    User::factory()->create(['instance_role' => InstanceRole::Owner]);
+    config()->set('instance.defaults.registrations_enabled', false);
+
+    $oauthUser = fakeSocialiteUser(['email' => 'stranger@example.com', 'id' => 'google-closed']);
+
+    expect(fn () => app(SocialiteService::class)
+        ->loginOrRegister(SocialProvider::Google, $oauthUser, null))
+        ->toThrow(SocialAuthException::class);
+
+    expect(User::query()->where('email', 'stranger@example.com')->exists())->toBeFalse();
+});
+
+/**
+ * An invitation is the deliberate exception: a closed instance still has to let
+ * an invited colleague finish signing up, including through a social provider.
+ */
+test('an invitation lets social sign-up through on a closed instance', function () {
+    User::factory()->create(['instance_role' => InstanceRole::Owner]);
+    config()->set('instance.defaults.registrations_enabled', false);
+
+    $oauthUser = fakeSocialiteUser(['email' => 'invited@example.com', 'id' => 'google-invited']);
+
+    $result = app(SocialiteService::class)
+        ->loginOrRegister(SocialProvider::Google, $oauthUser, 'some-invitation-token');
+
+    expect($result->wasRegistered)->toBeTrue()
+        ->and(User::query()->where('email', 'invited@example.com')->exists())->toBeTrue();
 });

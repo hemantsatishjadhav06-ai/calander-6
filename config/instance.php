@@ -26,6 +26,22 @@ return [
         'sponsor_url' => env('INSTANCE_SPONSOR_URL', ''),
     ],
 
+    /*
+     * Details the public pages (privacy policy, terms, data deletion) render.
+     * They are deliberately unset by default: an instance must not publish a
+     * company name or a contact address that its operator never agreed to.
+     * `contact_email` falls back to the sender address mail already uses, and
+     * the pages say plainly when nothing is configured rather than inventing
+     * a contact that does not answer.
+     */
+    'legal' => [
+        'company' => env('INSTANCE_COMPANY_NAME', ''),
+        'contact_email' => env('INSTANCE_CONTACT_EMAIL', env('MAIL_FROM_ADDRESS', '')),
+        'address' => env('INSTANCE_POSTAL_ADDRESS', ''),
+        'jurisdiction' => env('INSTANCE_JURISDICTION', ''),
+        'effective_date' => env('INSTANCE_LEGAL_EFFECTIVE_DATE', '2026-09-25'),
+    ],
+
     'defaults' => [
         'registrations_enabled' => env('INSTANCE_REGISTRATIONS_ENABLED', false),
         'workspace_creation_enabled' => env(
