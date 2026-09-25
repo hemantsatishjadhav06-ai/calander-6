@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 
 import AppLogoIcon from '@/components/layout/app-logo-icon';
 import { home } from '@/routes';
+import { privacy, terms } from '@/routes/legal';
 import type { AuthLayoutProps } from '@/types';
 
 export default function AuthSimpleLayout({
@@ -38,6 +39,28 @@ export default function AuthSimpleLayout({
                         </div>
                     </div>
                     {children}
+
+                    {/* Google, Meta, X and LinkedIn all expect a signup screen
+                        to link its terms and privacy policy before they approve
+                        an OAuth app, so these belong here and not only on the
+                        marketing pages. */}
+                    <p className="text-center text-xs text-muted-foreground">
+                        By continuing you agree to our{' '}
+                        <Link
+                            href={terms()}
+                            className="underline underline-offset-4 hover:text-foreground"
+                        >
+                            Terms
+                        </Link>{' '}
+                        and{' '}
+                        <Link
+                            href={privacy()}
+                            className="underline underline-offset-4 hover:text-foreground"
+                        >
+                            Privacy Policy
+                        </Link>
+                        .
+                    </p>
                 </div>
             </div>
         </div>

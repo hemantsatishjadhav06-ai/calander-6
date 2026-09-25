@@ -35,6 +35,10 @@ void createInertiaApp({
             // browser. No app shell/sidebar (no authenticated shared props).
             case name === 'mcp/landing':
                 return null;
+            // Marketing home and the legal pages. Reachable signed out, so they
+            // carry their own chrome rather than the app shell.
+            case name.startsWith('public/'):
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name === 'settings/instance' ||
