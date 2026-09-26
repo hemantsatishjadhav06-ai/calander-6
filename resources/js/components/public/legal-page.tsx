@@ -2,16 +2,10 @@ import { Head } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import PublicShell from '@/components/public/public-shell';
+import type { PublicSiteProps } from '@/types/public';
 
-export type LegalPageProps = {
-    appName: string;
-    company: string;
-    contactEmail: string;
-    address: string;
-    jurisdiction: string;
-    effectiveDate: string;
-    registrationsEnabled: boolean;
-};
+/** The legal pages receive the same operator details as every public page. */
+export type LegalPageProps = PublicSiteProps;
 
 /**
  * How to name the operator in prose when none is configured. An unset

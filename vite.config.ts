@@ -129,6 +129,14 @@ export default defineConfig(({ mode }) => {
                     bunny('Instrument Sans', {
                         weights: [400, 500, 600],
                     }),
+                    // Display face for the public product pages. Not preloaded:
+                    // only pages that render a display heading fetch it, so the
+                    // signed-in app pays nothing for it.
+                    bunny('Fraunces', {
+                        weights: [400, 500, 600],
+                        styles: ['normal', 'italic'],
+                        preload: false,
+                    }),
                 ],
             }),
             ...(disableHotPlugin ? [disableHotPlugin] : []),

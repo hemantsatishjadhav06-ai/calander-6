@@ -36,11 +36,14 @@ import {
     CircleIcon,
     ClapperboardIcon,
     Clock01Icon,
+    CodeIcon,
     ComputerIcon,
+    ComputerTerminal01Icon,
     CopyIcon,
     CreditCardIcon,
     CropIcon,
     CrownIcon,
+    DatabaseIcon,
     Delete02Icon,
     ExternalLinkIcon,
     EyeIcon,
@@ -48,6 +51,7 @@ import {
     File02Icon,
     Film01Icon,
     FilterIcon,
+    FingerPrintIcon,
     Folder01Icon,
     GlobeIcon,
     HeartIcon,
@@ -59,6 +63,7 @@ import {
     Key01Icon,
     Layers01Icon,
     LayoutGridIcon,
+    Link01Icon,
     Loading03Icon,
     LockIcon,
     Logout01Icon,
@@ -93,6 +98,7 @@ import {
     SearchRemoveIcon,
     SecurityCheckIcon,
     SentIcon,
+    ServerStack01Icon,
     Settings01Icon,
     Share01Icon,
     Shield01Icon,
@@ -163,16 +169,19 @@ export const CircleAlert = icon(AlertCircleIcon);
 export const CircleCheck = icon(CircleCheckIcon);
 export const Clapperboard = icon(ClapperboardIcon);
 export const Clock = icon(Clock01Icon);
+export const Code = icon(CodeIcon);
 export const Copy = icon(CopyIcon);
 export const CreditCard = icon(CreditCardIcon);
 export const Crop = icon(CropIcon);
 export const Crown = icon(CrownIcon);
+export const Database = icon(DatabaseIcon);
 export const ExternalLink = icon(ExternalLinkIcon);
 export const Eye = icon(EyeIcon);
 export const EyeOff = icon(EyeOffIcon);
 export const FileText = icon(File02Icon);
 export const Film = icon(Film01Icon);
 export const Filter = icon(FilterIcon);
+export const Fingerprint = icon(FingerPrintIcon);
 export const Folder = icon(Folder01Icon);
 export const Globe = icon(GlobeIcon);
 export const Heart = icon(HeartIcon);
@@ -184,6 +193,7 @@ export const Info = icon(InformationCircleIcon);
 export const KeyRound = icon(Key01Icon);
 export const Layers = icon(Layers01Icon);
 export const LayoutGrid = icon(LayoutGridIcon);
+export const Link2 = icon(Link01Icon);
 export const ListChecks = icon(CheckListIcon);
 export const Loader2 = icon(Loading03Icon);
 export const LoaderCircle = icon(Loading03Icon);
@@ -221,6 +231,7 @@ export const ScanLine = icon(ScanIcon);
 export const Search = icon(Search01Icon);
 export const SearchX = icon(SearchRemoveIcon);
 export const Send = icon(SentIcon);
+export const Server = icon(ServerStack01Icon);
 export const Settings = icon(Settings01Icon);
 export const Share2 = icon(Share01Icon);
 export const Shield = icon(Shield01Icon);
@@ -230,6 +241,7 @@ export const Smile = icon(SmileIcon);
 export const Split = icon(SplitIcon);
 export const Star = icon(StarIcon);
 export const Sun = icon(Sun01Icon);
+export const Terminal = icon(ComputerTerminal01Icon);
 export const ThumbsUp = icon(ThumbsUpIcon);
 export const Trash2 = icon(Delete02Icon);
 export const TrendingUp = icon(TrendingUpDownIcon);

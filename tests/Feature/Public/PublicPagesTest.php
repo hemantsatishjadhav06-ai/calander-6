@@ -16,6 +16,11 @@ test('every public page is reachable without an account', function (string $path
         ->assertInertia(fn (Assert $page) => $page->component($component));
 })->with([
     ['/', 'public/home'],
+    ['/features', 'public/features'],
+    ['/how-it-works', 'public/how-it-works'],
+    ['/platforms', 'public/platforms'],
+    ['/developers', 'public/developers'],
+    ['/security', 'public/security'],
     ['/privacy', 'public/privacy'],
     ['/terms', 'public/terms'],
     ['/data-deletion', 'public/data-deletion'],
