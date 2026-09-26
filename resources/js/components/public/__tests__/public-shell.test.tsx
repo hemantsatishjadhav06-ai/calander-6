@@ -1,8 +1,17 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { operatorName } from '@/components/public/legal-page';
 import PublicShell from '@/components/public/public-shell';
+
+/**
+ * The page PublicShell reads through `usePage()`: the current URL (for the
+ * active nav item) and the shared props (for the footer's source link).
+ */
+const page = vi.hoisted(() => ({
+    url: '/',
+    props: { repoUrl: '' } as { repoUrl: string },
+}));
 
 // PublicShell renders Inertia <Link>s, which need an initialized router.
 vi.mock('@inertiajs/react', () => ({
@@ -18,7 +27,23 @@ vi.mock('@inertiajs/react', () => ({
             {children}
         </a>
     ),
+    usePage: () => page,
 }));
+
+beforeAll(() => {
+    // The header's ThemeToggle -> useAppearance() -> prefersDark() ->
+    // window.matchMedia, which jsdom does not implement.
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+    }) as unknown as typeof window.matchMedia;
+});
+
+beforeEach(() => {
+    page.url = '/';
+    page.props.repoUrl = '';
+});
 
 function hrefs(): string[] {
     return screen
@@ -88,6 +113,85 @@ describe('PublicShell', () => {
                 `© ${new Date().getFullYear()} Neopolis Infra LLP`,
             ),
         ).toBeTruthy();
+    });
+});
+
+describe('PublicShell navigation', () => {
+    it('links every product page from the header', () => {
+        render(
+            <PublicShell appName="SM Manager" company="">
+                <p>body</p>
+            </PublicShell>,
+        );
+
+        expect(hrefs()).toEqual(
+            expect.arrayContaining([
+                '/features',
+                '/how-it-works',
+                '/platforms',
+                '/developers',
+                '/security',
+            ]),
+        );
+    });
+
+    it('marks the page being viewed as current', () => {
+        page.url = '/platforms?ref=nav';
+
+        render(
+            <PublicShell appName="SM Manager" company="">
+                <p>body</p>
+            </PublicShell>,
+        );
+
+        const current = screen
+            .getAllByRole('link', { name: 'Platforms' })
+            .filter((link) => link.getAttribute('aria-current') === 'page');
+
+        expect(current).toHaveLength(1);
+    });
+
+    it('opens and closes the mobile menu', () => {
+        render(
+            <PublicShell appName="SM Manager" company="">
+                <p>body</p>
+            </PublicShell>,
+        );
+
+        const toggle = screen.getByRole('button', { name: 'Open menu' });
+        expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+        fireEvent.click(toggle);
+
+        const close = screen.getByRole('button', { name: 'Close menu' });
+        expect(close.getAttribute('aria-expanded')).toBe('true');
+        expect(document.getElementById('public-mobile-menu')).not.toBeNull();
+
+        fireEvent.click(close);
+
+        expect(document.getElementById('public-mobile-menu')).toBeNull();
+    });
+
+    it('links the source repository when one is configured', () => {
+        page.props.repoUrl = 'https://github.com/acme/social';
+
+        render(
+            <PublicShell appName="SM Manager" company="">
+                <p>body</p>
+            </PublicShell>,
+        );
+
+        expect(hrefs()).toContain('https://github.com/acme/social');
+    });
+
+    it('hides the source link when no repository is configured', () => {
+        render(
+            <PublicShell appName="SM Manager" company="">
+                <p>body</p>
+            </PublicShell>,
+        );
+
+        expect(screen.queryByText('Source code')).toBeNull();
     });
 });
 

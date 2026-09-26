@@ -54,3 +54,39 @@ describe('form control labelling', () => {
         expect(read('posts/index.tsx')).toContain('aria-label="Search posts"');
     });
 });
+
+/**
+ * The public product pages title themselves either inline or through
+ * PageHero, which renders the page's h1 (and is the only shared component
+ * that does), so each page must use exactly one of the two, once.
+ */
+const publicProductPages = [
+    'public/home.tsx',
+    'public/features.tsx',
+    'public/how-it-works.tsx',
+    'public/platforms.tsx',
+    'public/developers.tsx',
+    'public/security.tsx',
+];
+
+describe('public product page headings', () => {
+    it('PageHero renders exactly one h1', () => {
+        const source = readFileSync(
+            resolve(
+                process.cwd(),
+                'resources/js/components/public/marketing.tsx',
+            ),
+            'utf8',
+        );
+
+        expect(source.match(/<h1[\s>]/g) ?? []).toHaveLength(1);
+    });
+
+    it.each(publicProductPages)('%s renders exactly one h1', (file) => {
+        const source = read(file);
+        const inline = source.match(/<h1[\s>]/g) ?? [];
+        const viaHero = source.match(/<PageHero[\s>]/g) ?? [];
+
+        expect(inline.length + viaHero.length).toBe(1);
+    });
+});

@@ -13,6 +13,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
 
+// The product pages: what the app does and how it does it. Public for the same
+// reason as the home page, but unlike `/` they do not bounce signed-in users to
+// the dashboard: someone already using the app may still want to read them.
+Route::get('/features', [PublicPageController::class, 'features'])->name('product.features');
+Route::get('/how-it-works', [PublicPageController::class, 'howItWorks'])->name('product.how-it-works');
+Route::get('/platforms', [PublicPageController::class, 'platforms'])->name('product.platforms');
+Route::get('/developers', [PublicPageController::class, 'developers'])->name('product.developers');
+Route::get('/security', [PublicPageController::class, 'security'])->name('product.security');
+
 // Reachable without an account on purpose. Google, Meta, X and LinkedIn all
 // require a public privacy policy before approving an OAuth app, and Meta
 // additionally requires a data-deletion URL, so these cannot sit behind auth.

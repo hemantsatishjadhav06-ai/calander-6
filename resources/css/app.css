@@ -17,10 +17,13 @@
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
 
-    /* Editorial display face for public/marketing surfaces (e.g. share page).
-       Falls back to a system serif; upgrades to Fraunces if that font is added. */
+    /* Editorial display face for public/marketing surfaces (the product
+       pages and the share page). Fraunces is self-hosted by the Vite fonts
+       plugin (see vite.config.ts) without a preload, so app pages that never
+       render a display heading never download it. */
     --font-display:
-        'Fraunces Variable', ui-serif, Georgia, 'Times New Roman', serif;
+        'Fraunces', 'Fraunces Variable', ui-serif, Georgia, 'Times New Roman',
+        serif;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -30,6 +33,10 @@
     --animate-aura-a: aura-a 14s ease-in-out infinite;
     --animate-aura-b: aura-b 18s ease-in-out infinite;
     --animate-aura-spin: aura-spin 32s linear infinite;
+
+    /* Slow bob for the floating cards on the public product pages. */
+    --animate-float: float 7s ease-in-out infinite;
+    --animate-float-slow: float 9s ease-in-out infinite;
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -42,6 +49,7 @@
 
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-primary-ink: var(--primary-ink);
 
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
@@ -84,6 +92,10 @@
     --popover-foreground: oklch(0.145 0 0);
     --primary: oklch(0.841 0.238 128.85);
     --primary-foreground: oklch(0.405 0.101 131.063);
+    /* The brand lime is a fill, not an ink: at L=0.84 it fails contrast as text
+       on white. --primary-ink is the same hue darkened to read as text (and
+       small icons) on light surfaces; in dark mode the lime itself reads fine. */
+    --primary-ink: oklch(0.5 0.15 132);
     --secondary: oklch(0.967 0.001 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.97 0 0);
@@ -153,6 +165,7 @@
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.768 0.233 130.85);
     --primary-foreground: oklch(0.405 0.101 131.063);
+    --primary-ink: var(--primary);
     --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -455,8 +468,45 @@
 @media (prefers-reduced-motion: reduce) {
     .animate-aura-a,
     .animate-aura-b,
-    .animate-aura-spin {
+    .animate-aura-spin,
+    .animate-float,
+    .animate-float-slow {
         animation: none !important;
+    }
+}
+
+@keyframes float {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
+    50% {
+        transform: translate3d(0, -10px, 0);
+    }
+}
+
+/* Scroll-linked entrance for sections on the public product pages. Pure CSS
+   (scroll-driven animations), so content is never hidden waiting on
+   JavaScript: a browser without `animation-timeline`, a reduced-motion
+   preference, or server-rendered HTML all simply show the content. */
+@keyframes reveal-up {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 28px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+        .reveal {
+            animation: reveal-up linear both;
+            animation-timeline: view();
+            animation-range: entry 0% entry 40%;
+        }
     }
 }
 
