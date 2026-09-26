@@ -174,7 +174,7 @@ function Surface({
     children: ReactNode;
 }) {
     return (
-        <Panel className="reveal flex flex-col p-7 sm:p-8">
+        <Panel className="reveal flex min-w-0 flex-col p-7 sm:p-8">
             <span className="flex size-12 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary-ink">
                 <Icon className="size-6" />
             </span>
@@ -184,7 +184,7 @@ function Surface({
             <h2 className="mt-1 font-[family-name:var(--font-display)] text-3xl font-medium tracking-tight text-foreground">
                 {title}
             </h2>
-            <code className="mt-4 block w-fit max-w-full truncate rounded-xl border border-border/70 bg-background/80 px-3 py-2 font-mono text-[13px] text-foreground">
+            <code className="mt-4 block w-fit max-w-full rounded-xl border border-border/70 bg-background/80 px-3 py-2 font-mono text-[13px] break-all text-foreground">
                 {url}
             </code>
             <div className="mt-6">{children}</div>
@@ -332,7 +332,16 @@ export default function Developers({
                             Every <Accent>endpoint</Accent>
                         </>
                     }
-                    description={`All paths are relative to ${apiBaseUrl}. Responses are JSON; validation errors come back as 422 with a message per field.`}
+                    description={
+                        <>
+                            All paths are relative to{' '}
+                            <code className="font-mono text-[0.9em] break-all text-foreground">
+                                {apiBaseUrl}
+                            </code>
+                            . Responses are JSON; validation errors come back as
+                            422 with a message per field.
+                        </>
+                    }
                 />
                 <div className="mt-12 grid gap-5 lg:grid-cols-2 lg:items-start">
                     <EndpointTable
