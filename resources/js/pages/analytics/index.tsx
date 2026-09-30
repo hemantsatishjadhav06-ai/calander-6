@@ -17,7 +17,10 @@ import { dayjs } from '@/lib/datetime/dayjs';
 import { disabledPlatformLabels } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import { index as analyticsRoute } from '@/routes/analytics';
+import {
+    index as analyticsRoute,
+    report as reportRoute,
+} from '@/routes/analytics';
 import { show as postRoute } from '@/routes/posts';
 import type {
     AnalyticsPageProps,
@@ -233,6 +236,13 @@ export default function AnalyticsIndex({
                             accounts.
                         </p>
                     </div>
+
+                    <Link
+                        href={reportRoute().url}
+                        className="rounded-lg border px-3 py-2 text-sm font-medium"
+                    >
+                        Reports & exports
+                    </Link>
 
                     {/* Range selector */}
                     <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-1">

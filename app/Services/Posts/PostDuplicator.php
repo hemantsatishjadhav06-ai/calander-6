@@ -6,6 +6,7 @@ namespace App\Services\Posts;
 
 use App\Enums\PostStatus;
 use App\Models\ConnectedAccount;
+use App\Models\CreatorExport;
 use App\Models\Post;
 use App\Models\PostMedia;
 use App\Models\PostTarget;
@@ -126,6 +127,12 @@ class PostDuplicator
                 'edit_settings' => $media->edit_settings,
             ]);
 
+            $creatorExport = CreatorExport::withoutGlobalScopes()->where('workspace_id', $draft->workspace_id)->where('post_media_id', $media->id)->first();
+            if ($creatorExport !== null) {
+                CreatorExport::create(['workspace_id' => $draft->workspace_id, 'project_id' => $creatorExport->project_id,
+                    'post_media_id' => $copy->id, 'project_revision' => $creatorExport->project_revision,
+                    'slide_id' => $creatorExport->slide_id, 'sha256' => $creatorExport->sha256]);
+            }
             $map[$media->id] = $copy->id;
         }
 

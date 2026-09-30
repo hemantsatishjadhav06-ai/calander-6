@@ -9,6 +9,7 @@ use App\Models\Post;
 use App\Models\PostMedia;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
+use App\Services\Creator\CreatorExportFreshness;
 use App\Services\Publishing\SegmentMediaResolver;
 use Illuminate\Support\Collection;
 
@@ -38,6 +39,8 @@ class PublishPrecheck
     {
         $media = $post->media;
         $mediaCount = $media->count();
+        $creatorStale = app(CreatorExportFreshness::class)->hasStaleExports($post);
+        $reviewStatus = app(PostReviewService::class)->status($post);
 
         /** @var list<array{connected_account_id: string, handle: ?string, platform: string, issues: list<string>}> $blocking */
         $blocking = [];
@@ -48,7 +51,10 @@ class PublishPrecheck
                 ? $this->targetIssues($target, $media)
                 : ['empty'];
 
-            if (! app(PostReviewService::class)->canPublish($post)) {
+            if ($creatorStale) {
+                $issues[] = 'creator_export_stale';
+            }
+            if (! in_array($reviewStatus, ['not_required', 'approved'], true)) {
                 $issues[] = 'review_required';
             }
 
@@ -80,6 +86,7 @@ class PublishPrecheck
 
         $messages = array_map(static fn (string $issue): string => match ($issue) {
             'review_required' => 'This content revision needs approval before publishing.',
+            'creator_export_stale' => 'This design changed. Export its current revision or remove its outdated media before publishing.',
             'empty' => 'Add text or media before publishing.',
             'media_required' => "{$label} needs at least one image or video.",
             'section_too_long' => "A section is over {$label}'s length limit.",

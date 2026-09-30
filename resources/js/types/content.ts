@@ -1,0 +1,52 @@
+export type BrandProfile = {
+    revision: number;
+    tagline: string | null;
+    voice: string | null;
+    audience: string | null;
+    guidelines: string | null;
+    palette: string[];
+    logo_asset_id: string | null;
+    default_hashtags: string[];
+    first_comment_enabled: boolean;
+    first_comment: string | null;
+    logo: ContentAsset | null;
+};
+export type ContentAsset = { id: string; name: string; content_url: string };
+export type ContentTemplate = {
+    id: string;
+    name: string;
+    description: string | null;
+    brief: string;
+    caption: string | null;
+    hashtags: string[];
+    first_comment: string | null;
+    revision: number;
+    source_project_id: string | null;
+    source_project_revision: number | null;
+    archived_at: string | null;
+    has_design: boolean;
+};
+export type ContentIdea = {
+    id: string;
+    title: string;
+    brief: string | null;
+    caption: string | null;
+    category: string | null;
+    tags: string[];
+    status: 'inbox' | 'planned' | 'archived' | 'drafted';
+    due_on: string | null;
+    template_id: string | null;
+    draft_post_id: string | null;
+    creator_project_id: string | null;
+    revision: number;
+    post_url: string | null;
+};
+export type ContentProject = { id: string; name: string; revision: number };
+export type ContentPage<T> = {
+    data: T[];
+    total: number;
+    current_page: number;
+    last_page: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+};

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Posts;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Post\StorePostImageEditRequest;
 use App\Http\Requests\Post\UpdatePostImageEditRequest;
+use App\Models\CreatorExport;
 use App\Models\Post;
 use App\Models\PostMedia;
 use App\Services\Posts\MediaStorageService;
@@ -34,6 +35,7 @@ class PostImageEditController extends Controller
     public function update(UpdatePostImageEditRequest $request, Post $post, PostMedia $media): JsonResponse
     {
         abort_unless($media->workspace_id === $post->workspace_id, 404);
+        abort_if(CreatorExport::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->where('post_media_id', $media->id)->exists(), 422, 'Open this design in Creator to edit its layers and export a new revision.');
         abort_unless($post->status->isEditable(), 422, 'This post can no longer be edited.');
         // Animated media (GIF, or a GIF-browser WebP) has no editor client-side;
         // replacing one with a raster beautified frame would silently flatten the

@@ -11,6 +11,7 @@ use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use App\Models\PostWorkflowEvent;
 use App\Models\User;
+use App\Services\Creator\CreatorExportFreshness;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +42,11 @@ class PostReviewService
             ])->values()->all(),
         ];
 
+        $creatorExports = app(CreatorExportFreshness::class)->snapshot($post);
+        if ($creatorExports !== []) {
+            $content['creator_exports'] = $creatorExports;
+        }
+
         return hash('sha256', json_encode($content, JSON_THROW_ON_ERROR));
     }
 
@@ -59,7 +65,8 @@ class PostReviewService
 
     public function canPublish(Post $post): bool
     {
-        return in_array($this->status($post), ['not_required', 'approved'], true);
+        return ! app(CreatorExportFreshness::class)->hasStaleExports($post)
+            && in_array($this->status($post), ['not_required', 'approved'], true);
     }
 
     public function act(Post $post, User $actor, string $action, string $revision, ?string $note, string $source): Post
@@ -72,6 +79,9 @@ class PostReviewService
         return DB::transaction(function () use ($post, $actor, $action, $revision, $note, $source): Post {
             $locked = Post::withoutGlobalScopes()->lockForUpdate()->findOrFail($post->id);
             abort_unless(in_array($locked->status, [PostStatus::Draft, PostStatus::Scheduled, PostStatus::Failed, PostStatus::Missed], true), 422, 'Review is available for drafts, scheduled posts and failed or missed posts.');
+            if (in_array($action, ['submit', 'approve'], true) && app(CreatorExportFreshness::class)->hasStaleExports($locked)) {
+                throw ValidationException::withMessages(['review' => 'Export the current design revision or remove its outdated media before requesting approval.']);
+            }
             $current = $this->revision($locked);
             abort_unless(hash_equals($current, $revision), 409, 'The content changed. Reload and review the current revision.');
             if ($locked->getAttribute('review_revision') === $current && $locked->getAttribute('review_status') === match ($action) {

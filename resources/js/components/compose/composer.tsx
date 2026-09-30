@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import PostGifController from '@/actions/App/Http/Controllers/Gifs/PostGifController';
 import WorkspaceMentionController from '@/actions/App/Http/Controllers/WorkspaceMentionController';
 import { useConfirm } from '@/components/common/confirm-dialog';
+import { CreatorDialog } from '@/components/creator/creator-dialog';
 import { AtSign, Eye, Pin, Plug, TriangleAlert } from '@/components/ui/icons';
 import { useAutosave } from '@/hooks/compose/use-autosave';
 import { useEmojiPreferences } from '@/hooks/compose/use-emoji-preferences';
@@ -250,6 +251,27 @@ export default function Composer({
         dispatch,
         onSaved,
     });
+    const [creatorSession, setCreatorSession] = useState<{
+        postId: string;
+        segmentRef: string;
+        projectId?: string;
+    } | null>(null);
+    const openingCreator = useRef(false);
+
+    async function openCreator(projectId?: string) {
+        if (openingCreator.current || readOnly) return;
+        openingCreator.current = true;
+        const segmentRef = editorRef.current?.activeSegmentRef() ?? '__head__';
+        try {
+            await flush();
+            const postId = await ensurePost();
+            if (postId) setCreatorSession({ postId, segmentRef, projectId });
+        } catch {
+            toast.error('Save this draft before opening Creator.');
+        } finally {
+            openingCreator.current = false;
+        }
+    }
     const publishStatus = usePublishStatus({ pagePost: post });
 
     const explicitUploadSegmentRef = useRef<string | null>(null);
@@ -582,6 +604,10 @@ export default function Composer({
     // source + settings; a plain one is beautified from scratch.
     function openImage(mediaId: string) {
         const m = state.media.find((x) => x.id === mediaId);
+        if (m?.creator_export?.project_id) {
+            void openCreator(m.creator_export.project_id);
+            return;
+        }
         // Animated images (GIF, or a GIF-browser WebP) have no editor — the
         // beautifier would flatten them to a still frame.
         if (!m || m.kind === 'video' || isAttachOnlyImage(m)) {
@@ -1134,6 +1160,34 @@ export default function Composer({
                 </div>
 
                 {/* Override banner (inside EditorBody) + editor */}
+                {state.media.some(
+                    (media) =>
+                        media.creator_export &&
+                        media.creator_export.rendered_revision !==
+                            media.creator_export.current_revision,
+                ) && (
+                    <div
+                        role="alert"
+                        className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm"
+                    >
+                        <span className="flex-1">
+                            A Creator design changed after these images were
+                            attached. Refresh its exports before reviewing or
+                            publishing.
+                        </span>
+                        {!readOnly && (
+                            <button
+                                type="button"
+                                className="font-medium underline"
+                                onClick={() => {
+                                    void openCreator();
+                                }}
+                            >
+                                Open Creator
+                            </button>
+                        )}
+                    </div>
+                )}
                 <EditorBody
                     ref={editorRef}
                     value={activeSegments}
@@ -1342,6 +1396,9 @@ export default function Composer({
                 {(!readOnly || state.media.length > 0) && (
                     <ComposerToolbar
                         readOnly={readOnly}
+                        onOpenCreator={() => {
+                            void openCreator();
+                        }}
                         onInsertEmoji={insertEmoji}
                         emojiRecents={emojiPrefs.recents}
                         emojiSkinTone={emojiPrefs.skinTone}
@@ -1415,6 +1472,19 @@ export default function Composer({
                         }}
                         pending={mediaUploads.pending}
                         handleFiles={handleAddedFiles}
+                    />
+                )}
+
+                {!readOnly && creatorSession && (
+                    <CreatorDialog
+                        postId={creatorSession.postId}
+                        targetSegmentRef={creatorSession.segmentRef}
+                        initialProjectId={creatorSession.projectId}
+                        onClose={() => setCreatorSession(null)}
+                        onAttached={(updatedPost) => {
+                            dispatch({ type: 'hydrate', post: updatedPost });
+                            onSaved?.();
+                        }}
                     />
                 )}
 

@@ -7,10 +7,12 @@ namespace App\Http\Controllers;
 use App\Enums\MetricsStatus;
 use App\Enums\Platform;
 use App\Enums\PostStatus;
+use App\Http\Requests\Analytics\ReportRequest;
 use App\Models\AccountMetric;
 use App\Models\ConnectedAccount;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Services\Metrics\WorkspaceReport;
 use App\Support\InstanceSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -19,9 +21,35 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AnalyticsController extends Controller
 {
+    public function report(ReportRequest $request, WorkspaceReport $reports): Response
+    {
+        return Inertia::render('analytics/report', [
+            'report' => $reports->build($request->workspace(), $request->filters()),
+        ]);
+    }
+
+    public function export(ReportRequest $request, WorkspaceReport $reports): StreamedResponse
+    {
+        $report = $reports->build($request->workspace(), $request->filters());
+
+        return response()->streamDownload(function () use ($report, $reports): void {
+            $stream = fopen('php://output', 'w');
+            if ($stream === false) {
+                throw new \RuntimeException('Unable to open the report output stream.');
+            }
+            $reports->writeCsv($report, $stream);
+            fclose($stream);
+        }, 'workspace-report-'.$request->filters()['from'].'-'.$request->filters()['to'].'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function index(Request $request, InstanceSettings $settings): Response
     {
         abort_unless($request->user()->can('viewAny', Post::class), 403);

@@ -76,3 +76,8 @@ require __DIR__.'/messaging.php';
 require __DIR__.'/feedback.php';
 
 require __DIR__.'/airtable.php';
+
+require __DIR__.'/content.php';
+
+require __DIR__.'/creator.php';
+require __DIR__.'/creator-generations.php';

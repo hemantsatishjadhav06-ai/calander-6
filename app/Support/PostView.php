@@ -9,6 +9,8 @@ use App\Models\Post;
 use App\Models\PostMedia;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
+use App\Services\Creator\CreatorExportFreshness;
+use App\Services\Posts\PostReviewService;
 use App\Services\Posts\PostSplitter;
 
 final class PostView
@@ -19,6 +21,8 @@ final class PostView
     public static function make(Post $post): array
     {
         $post->loadMissing('targets.placements');
+        $reviews = app(PostReviewService::class);
+        $creatorExports = collect(app(CreatorExportFreshness::class)->snapshot($post))->keyBy('media_id');
 
         $splitter = app(PostSplitter::class);
         $mediaCount = $post->media->count();
@@ -29,6 +33,9 @@ final class PostView
 
         return [
             'id' => $post->id,
+            'revision' => $reviews->revision($post),
+            'review_status' => $reviews->status($post),
+            'creator_export_stale' => $creatorExports->contains(fn (array $export): bool => $export['rendered_revision'] !== $export['current_revision']),
             'base_text' => $post->base_text,
             'segments' => $post->segments,
             'mentions' => $post->mentions ?? [],
@@ -69,7 +76,9 @@ final class PostView
                         $target->account?->maxTextLength(),
                     ),
                 ])->values()->all(),
-            'media' => $post->media->map(fn (PostMedia $media): array => $media->toView())->values()->all(),
+            'media' => $post->media->map(fn (PostMedia $media): array => [...$media->toView(),
+                'creator_export' => $creatorExports->get($media->id),
+            ])->values()->all(),
             'segment_breaks' => $defaultTarget?->segment_breaks ?? [], // @phpstan-ignore nullsafe.neverNull
             'placements' => $defaultTarget?->placements->map(fn (PostMediaPlacement $placement): array => [
                 'media_id' => $placement->post_media_id,

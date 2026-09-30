@@ -58,3 +58,11 @@ test('fetchAccount maps followers_count and media_count', function () {
     expect($r->followers)->toBe(42);
     expect($r->postsCount)->toBe(7);
 });
+
+test('unavailable instagram insights are not recorded as zero engagement', function (): void {
+    Http::fake(['graph.facebook.com/*/insights*' => Http::response(['error' => ['message' => 'Insights unavailable']], 400)]);
+    $account = ConnectedAccount::factory()->create(['platform' => Platform::Instagram]);
+    $target = PostTarget::factory()->create(['platform' => Platform::Instagram, 'remote_id' => '17800000000000000']);
+
+    expect($this->connector->fetchPost($account, $target, ['access_token' => 't'])->status)->toBe(MetricsStatus::Failed);
+});

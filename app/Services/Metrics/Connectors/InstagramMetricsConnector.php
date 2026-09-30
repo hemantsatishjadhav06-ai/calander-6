@@ -57,14 +57,6 @@ class InstagramMetricsConnector implements MetricsConnector
                 return PostMetricsResult::rateLimited($this->excerpt($response));
             }
 
-            // Non-fatal only for 400: the insights endpoint legitimately 400s for
-            // young media or metrics not yet available. Auth (401/403) and server
-            // (5xx) errors must surface as failures so token-refresh can trigger
-            // and outages aren't masked as zero-value success.
-            if ($response->status() === 400) {
-                return PostMetricsResult::ok(0, 0, 0);
-            }
-
             return PostMetricsResult::failed($this->excerpt($response));
         }
 

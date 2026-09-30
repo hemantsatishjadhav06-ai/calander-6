@@ -64,6 +64,7 @@ import { index as accountsRoute } from '@/routes/accounts';
 import { index as airtableRoute } from '@/routes/airtable';
 import { index as analyticsRoute } from '@/routes/analytics';
 import { index as calendarRoute } from '@/routes/calendar';
+import { index as brandRoute } from '@/routes/content/brand';
 import { index as engagementRoute } from '@/routes/engagement';
 import { index as messagesRoute } from '@/routes/messages';
 import { index as postsRoute } from '@/routes/posts';
@@ -98,6 +99,7 @@ const versionBadgeClassName =
 const postsNavItems: NavItem[] = [
     { title: 'Airtable workspace', href: airtableRoute(), icon: Blocks },
     { title: 'Posts', href: postsRoute(), icon: Inbox },
+    { title: 'Brand & ideas', href: brandRoute(), icon: Pencil },
     { title: 'Calendar', href: calendarRoute(), icon: CalendarDays },
     {
         title: 'Queue',

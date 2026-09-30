@@ -11,6 +11,7 @@ import {
     Shuffle,
     Smile,
     Split,
+    Wand2,
 } from '@/components/ui/icons';
 import { Kbd } from '@/components/ui/kbd';
 import {
@@ -66,6 +67,7 @@ type Props = {
     onEmojiSkinToneChange: (tone: EmojiSkinTone) => void;
     /** Attach a chosen GIF. Absent hides the GIF button (read-only, or disabled). */
     onAttachGif?: (item: GifItem) => void;
+    onOpenCreator?: () => void;
 };
 
 export function ComposerToolbar({
@@ -87,6 +89,7 @@ export function ComposerToolbar({
     emojiSkinTone,
     onEmojiSkinToneChange,
     onAttachGif,
+    onOpenCreator,
 }: Props) {
     const input = useRef<HTMLInputElement | null>(null);
 
@@ -210,6 +213,16 @@ export function ComposerToolbar({
                         )}
                     </EToolButton>
                 </>
+            )}
+
+            {!readOnly && onOpenCreator && (
+                <EToolButton
+                    title="Create an editable social post design"
+                    onClick={onOpenCreator}
+                >
+                    <Wand2 className="size-3.5" aria-hidden="true" />
+                    <span>Creator</span>
+                </EToolButton>
             )}
 
             <div className="ml-auto sm:flex-1" />
