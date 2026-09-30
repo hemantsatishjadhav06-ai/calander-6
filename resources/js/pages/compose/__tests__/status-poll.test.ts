@@ -8,8 +8,11 @@ import { usePostStatusPoll } from '@/hooks/compose/use-post-status-poll';
 import ComposePage from '@/pages/compose/index';
 import type { PostView, TargetStatus, TargetView } from '@/types/compose';
 
+const retryComment = vi.hoisted(() => vi.fn());
+
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
+    useHttp: () => ({ post: retryComment }),
     Link: ({ children }: { children?: ReactNode }) => children,
     usePage: () => ({ props: { features: { analytics: true } } }),
 }));
@@ -116,5 +119,6 @@ describe('compose status polling', () => {
         expect(container?.textContent).toContain('published-view');
         expect(container?.textContent).not.toContain('composer');
         expect(usePostStatusPoll).toHaveBeenCalledWith(post);
+        expect(retryComment).not.toHaveBeenCalled();
     });
 });
