@@ -11,6 +11,7 @@ use App\Console\Commands\PruneUsageEvents;
 use App\Console\Commands\ReconcileUsageCounters;
 use App\Console\Commands\RefreshCommunityStats;
 use App\Console\Commands\RefreshExpiringTokens;
+use App\Console\Commands\SyncDueAirtableWorkspaces;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -46,3 +47,5 @@ Schedule::command(PruneUsageEvents::class)->dailyAt('02:20');
 if (! config('subscriptions.enabled')) {
     Schedule::command(RefreshCommunityStats::class)->daily()->withoutOverlapping();
 }
+
+Schedule::command(SyncDueAirtableWorkspaces::class)->hourly()->withoutOverlapping();

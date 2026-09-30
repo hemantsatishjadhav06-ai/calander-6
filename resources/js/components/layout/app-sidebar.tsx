@@ -2,6 +2,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
 
 import PostingScheduleController from '@/actions/App/Http/Controllers/Posts/PostingScheduleController';
+import { InterfaceSwitch } from '@/components/airtable/interface-switch';
 import AppLogo from '@/components/layout/app-logo';
 import { NavUser } from '@/components/layout/nav-user';
 import { SidebarFooterCard } from '@/components/layout/sidebar-footer-card';
@@ -60,6 +61,7 @@ import {
 import { appVersion, githubReleaseUrl } from '@/lib/version';
 import { dashboard } from '@/routes';
 import { index as accountsRoute } from '@/routes/accounts';
+import { index as airtableRoute } from '@/routes/airtable';
 import { index as analyticsRoute } from '@/routes/analytics';
 import { index as calendarRoute } from '@/routes/calendar';
 import { index as engagementRoute } from '@/routes/engagement';
@@ -94,6 +96,7 @@ const versionBadgeClassName =
     'rounded-full border border-sidebar-border px-1.5 py-0.5 text-[10px] leading-none font-medium text-sidebar-foreground/60 transition-colors hover:border-sidebar-accent-foreground/30 hover:text-sidebar-foreground';
 
 const postsNavItems: NavItem[] = [
+    { title: 'Airtable workspace', href: airtableRoute(), icon: Blocks },
     { title: 'Posts', href: postsRoute(), icon: Inbox },
     { title: 'Calendar', href: calendarRoute(), icon: CalendarDays },
     {
@@ -206,6 +209,7 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                 </SidebarMenu>
                 <WorkspaceSelector />
+                {!collapsed && <InterfaceSwitch />}
             </SidebarHeader>
 
             <SidebarContent className="gap-0">

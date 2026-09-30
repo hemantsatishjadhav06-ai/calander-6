@@ -52,6 +52,12 @@ class PostDuplicator
                 $mediaIdMap = $this->createMediaRows($draft, $mediaPlan);
                 $this->cloneTargets($source, $draft, $mediaIdMap);
 
+                if ($source->getAttribute('review_required')) {
+                    $reviews = app(PostReviewService::class);
+                    $draft->forceFill(['review_required' => true, 'review_status' => 'pending', 'review_revision' => $reviews->revision($draft)])->save();
+                    $reviews->record($draft, 'reviewed_draft_copied', 'application');
+                }
+
                 return $draft->load('targets', 'media');
             });
         } catch (Throwable $e) {

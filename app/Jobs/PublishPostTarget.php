@@ -13,6 +13,7 @@ use App\Enums\Platform;
 use App\Enums\PostTargetStatus;
 use App\Exceptions\TokenRefreshException;
 use App\Exceptions\TransientTokenRefreshException;
+use App\Models\Post;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use App\Models\PostTargetAttempt;
@@ -20,6 +21,7 @@ use App\Notifications\AccountNeedsAttentionNotification;
 use App\Notifications\PostPublishedNotification;
 use App\Notifications\PublishFailedNotification;
 use App\Services\Billing\WorkspaceSubscriptionGate;
+use App\Services\Posts\PostReviewService;
 use App\Services\Publishing\BackoffSchedule;
 use App\Services\Publishing\PostStatusRollup;
 use App\Services\Publishing\PublishConnectorRegistry;
@@ -84,6 +86,18 @@ class PublishPostTarget implements ShouldQueue
         // Guard against a stale delayed retry or a double dispatch firing after the
         // target already reached a terminal state: doing nothing keeps it a no-op.
         if (in_array($target->status, self::TERMINAL, true)) {
+            return;
+        }
+
+        if (! app(PostReviewService::class)->canPublish($target->post()->firstOrFail())) {
+            $target->forceFill([
+                'status' => PostTargetStatus::Failed->value,
+                'error_kind' => ErrorKind::Validation->value,
+                'error_message' => 'This content revision needs approval before publishing.',
+                'next_attempt_at' => null,
+            ])->save();
+            $rollup->recompute($target->post()->firstOrFail());
+
             return;
         }
 
@@ -156,7 +170,8 @@ class PublishPostTarget implements ShouldQueue
             try {
                 $credentials = $tokens->fresh($account);
                 $connector = $registry->for($target->platform);
-                $result = $connector->publish($this->context($target, $credentials));
+                $context = $this->context($target, $credentials);
+                $result = $context ? $connector->publish($context) : PublishResult::failure(ErrorKind::Validation, 'This content revision needs approval before publishing.');
 
                 // The proactive token sweep can rotate a still-valid access token
                 // just after this job reads it. A resulting 401 means the request
@@ -166,7 +181,8 @@ class PublishPostTarget implements ShouldQueue
                 // account needs attention.
                 if ($result->errorKind === ErrorKind::AuthExpired) {
                     $credentials = $tokens->fresh($account, force: true);
-                    $result = $connector->publish($this->context($target, $credentials));
+                    $context = $this->context($target, $credentials);
+                    $result = $context ? $connector->publish($context) : PublishResult::failure(ErrorKind::Validation, 'This content revision needs approval before publishing.');
                 }
             } catch (TransientTokenRefreshException $e) {
                 // A transient token-endpoint failure (429/5xx/timeout) is not a bad
@@ -327,34 +343,44 @@ class PublishPostTarget implements ShouldQueue
     /**
      * @param  array<string, mixed>  $credentials
      */
-    private function context(PostTarget $target, array $credentials): PublishContext
+    private function context(PostTarget $target, array $credentials): ?PublishContext
     {
-        $post = $target->post()->firstOrFail();
-        $media = array_values($post->media()->get()->all());
+        return DB::transaction(function () use ($target, $credentials): ?PublishContext {
+            $post = Post::withoutGlobalScopes()->lockForUpdate()->findOrFail($target->post_id);
+            $post->load(['targets.placements', 'media']);
+            if (! app(PostReviewService::class)->canPublish($post)) {
+                return null;
+            }
+            $snapshot = $post->targets->firstWhere('id', $target->id);
+            if (! $snapshot) {
+                return null;
+            }
+            $target->setRawAttributes($snapshot->getAttributes(), true);
+            $media = array_values($post->media->all());
+            $placements = array_values($snapshot->placements
+                ->map(fn (PostMediaPlacement $p): array => [
+                    'post_media_id' => $p->post_media_id,
+                    'segment_ref' => $p->segment_ref,
+                    'position' => $p->position,
+                ])->all());
 
-        $placements = array_values($target->placements()->get()
-            ->map(fn (PostMediaPlacement $p): array => [
-                'post_media_id' => $p->post_media_id,
-                'segment_ref' => $p->segment_ref,
-                'position' => $p->position,
-            ])->all());
+            $mediaBySection = app(SegmentMediaResolver::class)->resolve(
+                sections: $target->sections,
+                sectionSources: $target->section_sources ?? [],
+                segmentBreaks: $target->segment_breaks ?? [],
+                placements: $placements,
+                allMedia: $media,
+            );
 
-        $mediaBySection = app(SegmentMediaResolver::class)->resolve(
-            sections: $target->sections,
-            sectionSources: $target->section_sources ?? [],
-            segmentBreaks: $target->segment_breaks ?? [],
-            placements: $placements,
-            allMedia: $media,
-        );
-
-        return new PublishContext(
-            target: $target,
-            segments: $target->sections,
-            media: $media,
-            account: $target->account()->firstOrFail(),
-            credentials: $credentials,
-            mediaBySection: $mediaBySection,
-        );
+            return new PublishContext(
+                target: $target,
+                segments: $target->sections,
+                media: $media,
+                account: $target->account()->firstOrFail(),
+                credentials: $credentials,
+                mediaBySection: $mediaBySection,
+            );
+        });
     }
 
     /**

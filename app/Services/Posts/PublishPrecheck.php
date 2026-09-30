@@ -48,6 +48,10 @@ class PublishPrecheck
                 ? $this->targetIssues($target, $media)
                 : ['empty'];
 
+            if (! app(PostReviewService::class)->canPublish($post)) {
+                $issues[] = 'review_required';
+            }
+
             if ($issues === []) {
                 continue;
             }
@@ -75,6 +79,7 @@ class PublishPrecheck
         $label = $platform->label();
 
         $messages = array_map(static fn (string $issue): string => match ($issue) {
+            'review_required' => 'This content revision needs approval before publishing.',
             'empty' => 'Add text or media before publishing.',
             'media_required' => "{$label} needs at least one image or video.",
             'section_too_long' => "A section is over {$label}'s length limit.",

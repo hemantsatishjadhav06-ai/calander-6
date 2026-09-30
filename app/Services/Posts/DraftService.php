@@ -328,9 +328,9 @@ class DraftService
      *
      * @throws PostStaleWriteException
      */
-    public function updateDraft(Post $post, DraftData $data): Post
+    public function updateDraft(Post $post, DraftData $data, ?string $source = 'application', bool $preserveDestination = false): Post
     {
-        return DB::transaction(function () use ($post, $data): Post {
+        return DB::transaction(function () use ($post, $data, $source, $preserveDestination): Post {
             $post = Post::withoutGlobalScopes()->lockForUpdate()->findOrFail($post->id);
 
             if ($data->expectedUpdatedAt !== null
@@ -343,7 +343,9 @@ class DraftService
                 'id' => $data->destinationId,
                 'ids' => $data->destinationIds,
             ];
-            $accountIds = $this->resolveDestinationAccountIds($post->workspace_id, $destination);
+            $accountIds = $preserveDestination
+                ? array_values($post->targets()->get()->map(fn (PostTarget $target): string => $target->connected_account_id)->all())
+                : $this->resolveDestinationAccountIds($post->workspace_id, $destination);
 
             // Only carry an explicitly-sent override/auto-split into the merge;
             // otherwise syncTargets preserves the survivor's existing value.
@@ -366,7 +368,7 @@ class DraftService
                 'segments' => $data->segments,
                 'base_text' => implode("\n", $data->segments),
                 'mentions' => $this->normalizeMentions($data->mentions),
-                'account_set_id' => $this->scopedAccountSetId($post->workspace_id, $destination),
+                'account_set_id' => $preserveDestination ? $post->account_set_id : $this->scopedAccountSetId($post->workspace_id, $destination),
             ];
             // Only overwrite the per-post boost override when the caller sent it;
             // a partial update that omits `auto_repost` must not reset it to null.
@@ -388,6 +390,11 @@ class DraftService
             $this->syncTargets($post, $accountIds, $data->segments, $autoSplitByAccount, $overrideByAccount, $post->mentions ?? [], $formatByAccount, $data);
 
             $post->touch();
+
+            if ($source !== null && $post->getAttribute('review_required')) {
+                $actor = auth()->user();
+                app(PostReviewService::class)->record($post, 'draft_saved', $source, $actor instanceof User ? $actor->id : null);
+            }
 
             return $post->fresh(['targets', 'media']);
         });
