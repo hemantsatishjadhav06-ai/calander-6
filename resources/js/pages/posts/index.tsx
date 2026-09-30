@@ -57,6 +57,10 @@ const PLATFORM_OPTIONS: { value: string; label: string }[] = [
     { value: 'x', label: 'X' },
     { value: 'bluesky', label: 'Bluesky' },
     { value: 'linkedin', label: 'LinkedIn' },
+    { value: 'facebook', label: 'Facebook' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'threads', label: 'Threads' },
+    { value: 'discord', label: 'Discord' },
 ];
 
 function FilterChip({
@@ -110,7 +114,7 @@ export default function PostsIndex({ posts, filters, sets, counts }: Props) {
                 platform: next.platform ?? filters.platform,
                 q: next.q ?? filters.q,
             },
-            only: ['posts', 'filters'],
+            only: ['posts', 'filters', 'counts'],
             reset: ['posts'],
             replace: true,
             preserveScroll: false,
