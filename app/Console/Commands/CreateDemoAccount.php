@@ -46,12 +46,12 @@ class CreateDemoAccount extends Command
             'in_hours' => 24,
         ],
         [
-            'text' => "Drag a post around the calendar to reschedule it. Drop it on a past slot and it stays where it was.",
+            'text' => 'Drag a post around the calendar to reschedule it. Drop it on a past slot and it stays where it was.',
             'status' => PostStatus::Scheduled,
             'in_hours' => 72,
         ],
         [
-            'text' => "Connect an account under Accounts to start publishing for real. Nothing here is connected yet, so nothing can go out by accident.",
+            'text' => 'Connect an account under Accounts to start publishing for real. Nothing here is connected yet, so nothing can go out by accident.',
             'status' => PostStatus::Draft,
             'in_hours' => null,
         ],

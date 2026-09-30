@@ -94,6 +94,7 @@
             "bun run lint:check",
             "bun run format:check",
             "bun run types:check",
+        "bun run test",
             "@refactor:check",
             "@test"
         ],

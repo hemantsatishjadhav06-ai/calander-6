@@ -7,6 +7,7 @@ on:
       - main
       - master
       - workos
+      - 'feat/**'
   pull_request:
     branches:
       - develop
@@ -49,10 +50,10 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install Node Dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Run Pint
-        run: composer lint
+        run: composer lint:check
 
       - name: Check Frontend Formatting
         run: bun run format:check

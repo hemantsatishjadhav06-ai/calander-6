@@ -287,11 +287,13 @@ export default function Features({
                 eyebrow="Review links"
                 title={
                     <>
-                        Get sign-off <Accent>without</Accent> another login.
+                        Share a preview <Accent>without</Accent> another login.
                     </>
                 }
                 description="Send a client or a colleague a read-only preview of a post. They see exactly what will go out; they do not need an account to see it."
                 points={[
+                    'Preview links are read-only; they do not record approval.',
+                    'Recorded approvals require a signed-in workspace reviewer and apply to the reviewed revision.',
                     'One link per reviewer, each revocable on its own.',
                     'Optional expiry, so old previews stop working.',
                     'Hidden from search engines and rate limited.',

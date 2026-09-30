@@ -2,6 +2,7 @@
 
 use App\Enums\Platform;
 use App\Mcp\Servers\ShoutrrrServer;
+use App\Mcp\Tools\ListConnectedAccountsTool;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -103,4 +104,16 @@ test('the how-it-works page reads its polling and repost numbers from config', f
         ->where('cadence.metrics', [['max_age_hours' => 48, 'interval_minutes' => 90]])
         ->where('repost.minDelayHours', 36)
         ->where('repost.minPercentile', 0.75));
+});
+
+test('the developers account tool describes every supported network', function () {
+    $tool = app(ListConnectedAccountsTool::class);
+
+    foreach (Platform::cases() as $platform) {
+        expect($tool->description())->toContain($platform->label());
+    }
+
+    $this->get('/developers')->assertInertia(fn (Assert $page) => $page
+        ->where('mcpTools', fn ($tools): bool => collect($tools)
+            ->firstWhere('name', $tool->name())['description'] === $tool->description()));
 });

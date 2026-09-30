@@ -7,6 +7,7 @@ on:
       - main
       - master
       - workos
+      - 'feat/**'
   pull_request:
     branches:
       - develop
@@ -56,7 +57,7 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install Node Dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Copy Environment File
         run: cp .env.example .env
@@ -69,6 +70,12 @@ jobs:
 
       - name: Build Assets
         run: bun run build
+
+      - name: Check Frontend Types
+        run: bun run types:check
+
+      - name: Test Frontend
+        run: bun run test
 
       - name: Tests
         run: php artisan test --parallel
