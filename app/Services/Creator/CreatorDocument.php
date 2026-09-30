@@ -16,7 +16,9 @@ final class CreatorDocument
 
     private const string IDENTIFIER = '/^[a-zA-Z0-9_-]{1,100}$/';
 
-    /** @param array<string, mixed> $document @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $document
+     * @return array<string, mixed> */
     public static function validate(array $document, string $workspaceId): array
     {
         if (strlen(json_encode($document, JSON_THROW_ON_ERROR)) > 2_000_000) {
@@ -112,7 +114,8 @@ final class CreatorDocument
         return $validator->validate();
     }
 
-    /** @return array<string, array<mixed>> */
+    /**
+     * @return array<string, array<mixed>> */
     private static function layerRules(string $type): array
     {
         $rules = [
@@ -175,7 +178,8 @@ final class CreatorDocument
         }];
     }
 
-    /** @param array<string, mixed> $document */
+    /**
+     * @param array<string, mixed> $document */
     public static function hash(array $document): string
     {
         return hash('sha256', json_encode(self::canonical($document), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));

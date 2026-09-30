@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class CreatorProjectService
 {
-    /** @param array<string, mixed> $data */
+    /**
+     * @param array<string, mixed> $data */
     public function create(User $actor, array $data): CreatorProject
     {
         $workspaceId = (string) $actor->current_workspace_id;
@@ -24,7 +25,8 @@ class CreatorProjectService
             'name' => $data['name'], 'revision' => 1, 'document' => $document, 'document_hash' => CreatorDocument::hash($document)]);
     }
 
-    /** @param array<string, mixed> $data */
+    /**
+     * @param array<string, mixed> $data */
     public function update(CreatorProject $project, array $data): CreatorProject
     {
         $document = CreatorDocument::validate($data['document'], $project->workspace_id);

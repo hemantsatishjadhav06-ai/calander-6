@@ -21,7 +21,8 @@ final class CreatorGenerationService
         private readonly CreatorAssetStorage $assets,
     ) {}
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param array<string, mixed> $payload */
     public function quote(string $workspaceId, string $actorId, array $payload): CreatorGeneration
     {
         if (($payload['expected_workspace_id'] ?? null) !== $workspaceId) {
@@ -195,7 +196,8 @@ final class CreatorGenerationService
         return CreatorAsset::query()->where('workspace_id', $workspaceId)->whereKey($assetId)->firstOrFail();
     }
 
-    /** @param array<string, mixed> $input */
+    /**
+     * @param array<string, mixed> $input */
     private function validateAssetForOperation(CreatorAsset $asset, array $input): void
     {
         if ($input['operation'] === 'layerize' && ($asset->width * $asset->height < 512 * 512 || $asset->width / max(1, $asset->height) > 16 || $asset->height / max(1, $asset->width) > 16)) {

@@ -6,7 +6,8 @@ namespace App\Services\Creator;
 
 final class CreatorOutputNormalizer
 {
-    /** @param array<string, mixed> $body
+    /**
+     * @param  array<string, mixed>  $body
      * @return list<array<string, mixed>>
      */
     public function normalize(array $body, bool $layerize): array
@@ -44,7 +45,7 @@ final class CreatorOutputNormalizer
             if (! isset($seenLayers[0])) {
                 throw new CreatorProviderException('invalid_layer', 'The model did not return a base layer.');
             }
-            usort($normalized, fn (array $left, array $right): int => $left['z_index'] <=> $right['z_index']);
+            usort($normalized, fn (array $left, array $right): int => ($left['z_index'] ?? 0) <=> ($right['z_index'] ?? 0));
         }
 
         return $normalized;

@@ -28,7 +28,9 @@ class CreatorExportController extends Controller
         $batch = $exports->attach($post, $request->validated(), $request->user()->id);
         $post = $post->fresh(['targets.account', 'targets.placements', 'media']);
         $view = PostView::make($post);
-        $media = collect($view['media'])->keyBy('id');
+        /** @var list<array<string, mixed>> $mediaViews */
+        $mediaViews = $view['media'];
+        $media = collect($mediaViews)->keyBy('id');
 
         return response()->json(['workspace_id' => $post->workspace_id, 'post' => $view, 'media' => array_map(fn (string $id): array => $media->get($id), $batch->media_ids),
             'batch_id' => $batch->id, 'revision' => $reviews->revision($post), 'review_status' => $reviews->status($post)], 201);

@@ -23,10 +23,11 @@ use Throwable;
 
 class CreatorExportService
 {
-    /** @param array<string, mixed> $data */
+    /**
+     * @param array<string, mixed> $data */
     public function attach(Post $post, array $data, string $actorId): CreatorExportBatch
     {
-        $project = CreatorProject::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->findOrFail($data['project_id']);
+        $project = CreatorProject::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->findOrFail((string) $data['project_id']);
         $plan = $this->inspectFiles($data['slides']);
         $hash = CreatorDocument::hash([
             'project_id' => $project->id, 'project_revision' => (int) $data['project_revision'],
@@ -66,7 +67,7 @@ class CreatorExportService
                 $replaceIds = $data['replace_media_ids'] ?? [];
                 $oldMedia = PostMedia::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->where('post_id', $post->id)->orderBy('position')->orderBy('id')->get();
                 $replacementExports = CreatorExport::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->where('project_id', $project->id)
-                    ->whereIn('post_media_id', $oldMedia->pluck('id')->all())->get();
+                    ->whereIn('post_media_id', array_values($oldMedia->map(static fn (PostMedia $media): string => $media->id)->all()))->get();
                 $validReplaceIds = $replacementExports->pluck('post_media_id')->all();
                 abort_unless(array_diff($replaceIds, $validReplaceIds) === [], 422, 'Only this post\'s exports from this design can be replaced.');
                 $segmentRef = $data['target_segment_ref'] ?? '__head__';
@@ -94,9 +95,9 @@ class CreatorExportService
                         $oldToNew[$export->post_media_id] = $newBySlide[$export->slide_id];
                     }
                 }
-                $targetPlans = $this->targetPlans($locked, $replaceIds, $newIds, $oldToNew, $segmentRef, $oldMedia->all());
-                $this->assertTargetCompatibility($locked, $oldMedia->all(), $newIds, $targetPlans, $segmentRef);
-                $orderedIds = $this->splice($oldMedia->pluck('id')->all(), $replaceIds, $newIds);
+                $targetPlans = $this->targetPlans($locked, $replaceIds, $newIds, $oldToNew, $segmentRef, array_values($oldMedia->all()));
+                $this->assertTargetCompatibility($locked, array_values($oldMedia->all()), $newIds, $targetPlans, $segmentRef);
+                $orderedIds = $this->splice(array_values($oldMedia->map(static fn (PostMedia $media): string => $media->id)->all()), $replaceIds, $newIds);
                 PostMedia::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->where('post_id', $post->id)->whereIn('id', $replaceIds)->update(['post_id' => null]);
                 foreach ($orderedIds as $position => $id) {
                     PostMedia::withoutGlobalScopes()->where('workspace_id', $post->workspace_id)->where('post_id', $post->id)->whereKey($id)->update(['position' => $position]);
@@ -120,7 +121,9 @@ class CreatorExportService
         }
     }
 
-    /** @param list<array{slide_id: string, file: UploadedFile, alt_text?: string|null}> $slides @return list<array<string, mixed>> */
+    /**
+     * @param list<array{slide_id: string, file: UploadedFile, alt_text?: string|null}> $slides
+     * @return list<array<string, mixed>> */
     private function inspectFiles(array $slides): array
     {
         $plan = [];
@@ -137,7 +140,9 @@ class CreatorExportService
         return $plan;
     }
 
-    /** @param array<string, mixed> $data @param list<array<string, mixed>> $plan */
+    /**
+     * @param array<string, mixed> $data
+     * @param list<array<string, mixed>> $plan */
     private function assertCurrentProject(CreatorProject $project, array $data, array $plan): void
     {
         abort_unless($project->revision === (int) $data['project_revision'], 409, 'The design changed. Export its latest revision.');
@@ -160,7 +165,11 @@ class CreatorExportService
         return $batch;
     }
 
-    /** @param list<string> $ids @param list<string> $replace @param list<string> $new @return list<string> */
+    /**
+     * @param list<string> $ids
+     * @param list<string> $replace
+     * @param list<string> $new
+     * @return list<string> */
     private function splice(array $ids, array $replace, array $new): array
     {
         $result = [];
@@ -182,7 +191,10 @@ class CreatorExportService
         return $result;
     }
 
-    /** @param list<PostMedia> $media @param list<string> $newIds @param list<array<string, mixed>> $targetPlans */
+    /**
+     * @param list<PostMedia> $media
+     * @param list<string> $newIds
+     * @param list<array<string, mixed>> $targetPlans */
     private function assertTargetCompatibility(Post $post, array $media, array $newIds, array $targetPlans, string $segmentRef): void
     {
         $targets = $post->targets()->get()->keyBy('connected_account_id');
@@ -214,14 +226,19 @@ class CreatorExportService
         }
     }
 
-    /** @param list<string> $replaceIds @param list<string> $newIds @param array<string, string> $oldToNew @param list<PostMedia> $oldMedia @return list<array<string, mixed>> */
+    /**
+     * @param list<string> $replaceIds
+     * @param list<string> $newIds
+     * @param array<string, string> $oldToNew
+     * @param list<PostMedia> $oldMedia
+     * @return list<array<string, mixed>> */
     private function targetPlans(Post $post, array $replaceIds, array $newIds, array $oldToNew, string $segmentRef, array $oldMedia): array
     {
         $targetPayloads = [];
         foreach ($post->targets()->with('placements')->get() as $target) {
-            $placements = $target->placements->sortBy('position')->map(static fn (PostMediaPlacement $placement): array => [
+            $placements = array_values($target->placements->sortBy('position')->map(static fn (PostMediaPlacement $placement): array => [
                 'media_id' => $placement->post_media_id, 'segment_ref' => $placement->segment_ref, 'position' => $placement->position,
-            ])->values()->all();
+            ])->all());
             $override = $target->content_override;
             $overrideIds = is_array($override) ? ($override['media_ids'] ?? null) : null;
             if ($placements === []) {
@@ -292,14 +309,19 @@ class CreatorExportService
             $orderedIds = array_map(static fn (int $index): string => $result[$index]['media_id'], $slots);
             usort($orderedIds, static fn (string $left, string $right): int => $rank[$left] <=> $rank[$right]);
             foreach ($slots as $offset => $index) {
-                $result[$index]['media_id'] = $orderedIds[$offset];
+                $placement = $result[$index];
+                $result[$index] = ['media_id' => $orderedIds[$offset], 'segment_ref' => $placement['segment_ref'], 'position' => $placement['position']];
             }
         }
 
         return $result;
     }
 
-    /** @param list<string> $ids @param list<string> $replaceIds @param array<string, string> $oldToNew @return list<string> */
+    /**
+     * @param list<string> $ids
+     * @param list<string> $replaceIds
+     * @param array<string, string> $oldToNew
+     * @return list<string> */
     private function remapSelection(array $ids, array $replaceIds, array $oldToNew): array
     {
         $result = [];
@@ -314,7 +336,8 @@ class CreatorExportService
         return $result;
     }
 
-    /** @param list<array<string, mixed>> $targetPayloads */
+    /**
+     * @param list<array<string, mixed>> $targetPayloads */
     private function updateTargets(Post $post, array $targetPayloads): void
     {
         $data = DraftData::fromArray(['segments' => $post->segments, 'targets' => $targetPayloads]);
@@ -328,7 +351,8 @@ class CreatorExportService
         app(DraftService::class)->syncTargets($post, $accountIds, $post->segments, [], $overrides, $post->mentions ?? [], [], $data);
     }
 
-    /** @param list<array{0: string, 1: string}> $files */
+    /**
+     * @param list<array{0: string, 1: string}> $files */
     private function removeFiles(array $files): void
     {
         foreach ($files as [$disk, $path]) {

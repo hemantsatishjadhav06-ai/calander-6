@@ -31,7 +31,8 @@ final class CreatorModelRegistry
         'upscale' => ['Upscale image', 'fal-ai/esrgan', true],
     ];
 
-    /** @return list<array{id: string, label: string, endpoint_id: string, requires_asset: bool}> */
+    /**
+     * @return list<array{id: string, label: string, endpoint_id: string, requires_asset: bool}> */
     public function operations(): array
     {
         $operations = [];
@@ -58,7 +59,8 @@ final class CreatorModelRegistry
         }
     }
 
-    /** @param array<string, mixed> $payload
+    /**
+     * @param  array<string, mixed>  $payload
      * @return array{operation: string, prompt: string, asset_id: ?string, options: array<string, mixed>, endpoint_id: string}
      */
     public function validate(array $payload): array
@@ -83,7 +85,7 @@ final class CreatorModelRegistry
         $rules = [
             'operation' => ['required', 'string'],
             'prompt' => [$nano ? 'required' : 'nullable', 'string', $nano ? 'min:3' : 'min:0', 'max:10000'],
-            'asset_id' => [$needsAsset ? 'required' : 'prohibited', 'uuid'],
+            'asset_id' => $needsAsset ? ['required', 'uuid'] : ['prohibited', 'nullable'],
             'options' => ['sometimes', 'array'.($optionRules === [] ? '' : ':'.implode(',', array_keys($optionRules)))],
         ];
         foreach ($optionRules as $key => $rule) {
@@ -114,7 +116,8 @@ final class CreatorModelRegistry
         return ['operation' => $operation, 'endpoint_id' => $endpoint, 'prompt' => trim($validated['prompt'] ?? ''), 'asset_id' => $validated['asset_id'] ?? null, 'options' => $options];
     }
 
-    /** @param array<string, mixed> $input
+    /**
+     * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public function providerInput(array $input, ?string $ownedImageData): array

@@ -29,7 +29,7 @@ class BrandPromptBuilder
             $parts[] = "Reusable creative direction:\n".$template->brief;
         }
         $parts[] = "Current brief:\n".trim($brief);
-        $tags = array_values(array_unique([...($brand?->default_hashtags ?? []), ...($template?->hashtags ?? [])]));
+        $tags = array_values(array_unique([...($brand->default_hashtags ?? []), ...($template->hashtags ?? [])]));
         if ($tags !== []) {
             $parts[] = 'Suggested caption hashtags: '.implode(' ', $tags);
         }

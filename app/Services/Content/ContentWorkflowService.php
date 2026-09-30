@@ -28,7 +28,7 @@ class ContentWorkflowService
         return DB::transaction(function () use ($workspaceId, $data): WorkspaceBrandProfile {
             Workspace::query()->whereKey($workspaceId)->lockForUpdate()->firstOrFail();
             $brand = WorkspaceBrandProfile::query()->where('workspace_id', $workspaceId)->lockForUpdate()->first();
-            abort_unless(($brand?->revision ?? 0) === (int) $data['expected_revision'], 409, 'The brand profile changed. Reload before saving.');
+            abort_unless(($brand->revision ?? 0) === (int) $data['expected_revision'], 409, 'The brand profile changed. Reload before saving.');
             unset($data['expected_revision'], $data['expected_workspace_id']);
             $brand ??= new WorkspaceBrandProfile(['workspace_id' => $workspaceId, 'revision' => 0]);
             $brand->fill($data);
@@ -52,7 +52,7 @@ class ContentWorkflowService
             if (array_key_exists('source_project_id', $data)) {
                 $document = null;
                 if ($data['source_project_id']) {
-                    $project = CreatorProject::query()->where('workspace_id', $workspaceId)->lockForUpdate()->findOrFail($data['source_project_id']);
+                    $project = CreatorProject::query()->where('workspace_id', $workspaceId)->lockForUpdate()->findOrFail((string) $data['source_project_id']);
                     abort_unless($project->revision === (int) $data['source_project_revision'], 409, 'The design changed. Save and select the current revision.');
                     $document = CreatorDocument::validate($project->document, $workspaceId);
                 } else {
@@ -123,8 +123,8 @@ class ContentWorkflowService
             $template = $locked->template_id ? ContentTemplate::query()->where('workspace_id', $locked->workspace_id)->lockForUpdate()->findOrFail($locked->template_id) : null;
             abort_if($template?->archived_at !== null, 422, 'The selected template was archived. Choose an active template.');
             $brand = WorkspaceBrandProfile::query()->where('workspace_id', $locked->workspace_id)->first();
-            $caption = trim($locked->caption ?: ($template?->caption ?? ''));
-            $tags = array_values(array_unique([...($brand?->default_hashtags ?? []), ...($template?->hashtags ?? [])]));
+            $caption = trim($locked->caption ?: ($template->caption ?? ''));
+            $tags = array_values(array_unique([...($brand->default_hashtags ?? []), ...($template->hashtags ?? [])]));
             if ($tags !== [] && $caption !== '') {
                 $caption .= "\n\n".implode(' ', $tags);
             }

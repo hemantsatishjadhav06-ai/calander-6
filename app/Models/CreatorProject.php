@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $name
  * @property int $revision
  * @property string $document_hash
- * @property array<string, mixed> $document
+ * @property array{schema_version: int, canvas: array{width: int, height: int}, slides: list<array{id: string, name?: string, background_color: string, layers: list<array<string, mixed>>}>} $document
  */
 #[Fillable(['workspace_id', 'created_by_id', 'name', 'revision', 'document_hash', 'document'])]
 class CreatorProject extends Model

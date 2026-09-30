@@ -127,7 +127,7 @@ class ContentWorkspaceController extends Controller
     {
         $workspaceId = $this->workspaceId($request);
         $data = $request->validate(['expected_workspace_id' => ['required', 'uuid', Rule::in([$workspaceId])], 'brief' => ['required', 'string', 'max:10000'], 'template_id' => ['nullable', 'uuid', Rule::exists('content_templates', 'id')->where('workspace_id', $workspaceId)->whereNull('archived_at')]]);
-        $template = isset($data['template_id']) ? ContentTemplate::query()->where('workspace_id', $workspaceId)->findOrFail($data['template_id']) : null;
+        $template = isset($data['template_id']) ? ContentTemplate::query()->where('workspace_id', $workspaceId)->findOrFail((string) $data['template_id']) : null;
 
         return response()->json(['prompt' => $prompts->build($workspaceId, $data['brief'], $template)]);
     }

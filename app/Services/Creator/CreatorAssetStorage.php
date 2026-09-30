@@ -28,7 +28,7 @@ class CreatorAssetStorage
     {
         $metadata = self::inspect($bytes, $mime);
         $extension = match ($metadata['mime']) {
-            'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp',
+            'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', default => throw new RuntimeException('Unsupported Creator image format'),
         };
         abort_unless(in_array($kind, ['image', 'logo'], true), 422, 'Unsupported asset kind.');
         $disk = FileStorage::diskName();
@@ -46,7 +46,8 @@ class CreatorAssetStorage
         }
     }
 
-    /** @return array{mime: string, size_bytes: int, width: int, height: int} */
+    /**
+     * @return array{mime: string, size_bytes: int, width: int, height: int} */
     public static function inspect(string $bytes, string $mime): array
     {
         $size = strlen($bytes);

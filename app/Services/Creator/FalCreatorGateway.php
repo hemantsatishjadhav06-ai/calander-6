@@ -32,7 +32,8 @@ final class FalCreatorGateway
         }
     }
 
-    /** @param array<string, mixed> $input
+    /**
+     * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public function quote(array $input): array
@@ -41,7 +42,13 @@ final class FalCreatorGateway
         $endpoint = $input['endpoint_id'];
         $this->models->assertEndpoint($endpoint);
         $prices = $this->request('GET', 'https://api.fal.ai/v1/models/pricing', ['endpoint_id' => $endpoint]);
-        $price = collect($prices['prices'] ?? [])->first(fn (mixed $price): bool => is_array($price) && ($price['endpoint_id'] ?? null) === $endpoint);
+        $price = null;
+        foreach (is_array($prices['prices'] ?? null) ? $prices['prices'] : [] as $row) {
+            if (is_array($row) && ($row['endpoint_id'] ?? null) === $endpoint) {
+                $price = $row;
+                break;
+            }
+        }
         if (! is_array($price) || ! is_numeric($price['unit_price'] ?? null) || ! is_finite((float) $price['unit_price']) || (float) $price['unit_price'] < 0 || ($price['currency'] ?? null) !== 'USD') {
             throw new CreatorProviderException('quote_unavailable', 'A current USD price is unavailable. Generation has not been submitted.', 503);
         }
@@ -77,7 +84,8 @@ final class FalCreatorGateway
         ];
     }
 
-    /** @param array<string, mixed> $input
+    /**
+     * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public function submit(string $endpoint, array $input): array
@@ -99,7 +107,8 @@ final class FalCreatorGateway
         return $body;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed> */
     public function status(string $url, string $requestId): array
     {
         $this->validateQueueUrl($url, $requestId, '/status');
@@ -107,7 +116,8 @@ final class FalCreatorGateway
         return $this->request('GET', $url);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed> */
     public function result(string $url, string $requestId): array
     {
         $this->validateQueueUrl($url, $requestId, '');
@@ -115,7 +125,8 @@ final class FalCreatorGateway
         return $this->request('GET', $url);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed> */
     public function cancel(string $url, string $requestId): array
     {
         $this->validateQueueUrl($url, $requestId, '/cancel');
@@ -133,7 +144,8 @@ final class FalCreatorGateway
         }
     }
 
-    /** @param array<string, mixed> $body */
+    /**
+     * @param array<string, mixed> $body */
     public function state(array $body): string
     {
         if (! empty($body['error']) || ! empty($body['error_type'])) {
@@ -155,7 +167,8 @@ final class FalCreatorGateway
             ->withOptions(['allow_redirects' => false]);
     }
 
-    /** @param array<string, mixed> $data
+    /**
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function request(string $method, string $url, array $data = [], bool $submission = false): array

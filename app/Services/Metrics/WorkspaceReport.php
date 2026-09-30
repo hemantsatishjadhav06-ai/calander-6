@@ -129,8 +129,8 @@ class WorkspaceReport
             'account_id' => $target->connected_account_id,
             'account' => $target->account?->display_name ?: $target->account?->handle,
             'handle' => $target->account?->handle,
-            'metrics_status' => $target->metrics_status?->value ?? 'not_captured',
-            'captured_at' => $isMeasured ? $target->metrics_captured_at?->toIso8601String() : null,
+            'metrics_status' => $target->metrics_status->value ?? 'not_captured',
+            'captured_at' => $isMeasured ? $target->metrics_captured_at->toIso8601String() : null,
             'last_checked_at' => $target->metrics_captured_at?->toIso8601String(),
             'supported_fields' => $fields,
             'polling_enabled' => $this->settings->postMetricsPollingEnabled($target->platform),
@@ -152,7 +152,6 @@ class WorkspaceReport
             Platform::Bluesky => ['likes', 'comments', 'reposts'],
             Platform::LinkedIn => $target->account?->isLinkedInOrganization() ? ['likes', 'comments', 'reposts', 'impressions'] : [],
             Platform::X, Platform::Facebook, Platform::Instagram, Platform::Threads => ['likes', 'comments', 'reposts', 'impressions'],
-            default => [],
         };
     }
 

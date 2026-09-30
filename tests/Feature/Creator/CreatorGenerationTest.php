@@ -8,6 +8,7 @@ use App\Services\Creator\CreatorOutputDownloader;
 use App\Services\Creator\CreatorOutputNormalizer;
 use App\Services\Creator\CreatorProviderException;
 use App\Services\Creator\FalCreatorGateway;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -283,7 +284,7 @@ it('imports bounded batches and resumes without refetching or repeating generati
     Http::fake([
         $receipt['status_url'] => Http::response(['status' => 'COMPLETED']),
         $receipt['response_url'] => Http::response(['images' => [['url' => 'https://v3.fal.media/files/one.png'], ['url' => 'https://v3.fal.media/files/two.png']]]),
-        'https://v3.fal.media/files/*' => Http::response(transparentPng(), 200, ['Content-Type' => 'image/png']),
+        'https://v3.fal.media/files/*' => fn (): PromiseInterface => Http::response(transparentPng(), 200, ['Content-Type' => 'image/png']),
     ]);
     $this->getJson('/creator/generations/'.$generation->id)->assertOk()->assertJsonPath('generation.status', 'importing')->assertJsonCount(1, 'generation.outputs')->assertJsonPath('generation.total_outputs', 2);
     $this->getJson('/creator/generations/'.$generation->id)->assertOk()->assertJsonPath('generation.status', 'completed')->assertJsonCount(2, 'generation.outputs');

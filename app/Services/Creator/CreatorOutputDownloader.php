@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Http;
 
 final class CreatorOutputDownloader
 {
-    /** @return array{bytes: string, mime: string} */
+    /**
+     * @return array{bytes: string, mime: string} */
     public function download(string $url): array
     {
         $parts = parse_url($url);
@@ -36,7 +37,7 @@ final class CreatorOutputDownloader
             throw new CreatorProviderException('output_too_large', 'The generated image exceeds the 8 MiB import limit.');
         }
         $info = @getimagesizefromstring($bytes);
-        if (! is_array($info) || ! in_array($info['mime'] ?? '', ['image/png', 'image/jpeg', 'image/webp'], true)) {
+        if (! is_array($info) || ! in_array($info['mime'], ['image/png', 'image/jpeg', 'image/webp'], true)) {
             throw new CreatorProviderException('invalid_output_image', 'The model result is not a supported raster image.');
         }
 
