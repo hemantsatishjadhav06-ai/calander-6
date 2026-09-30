@@ -45,6 +45,7 @@ class AirtableController extends Controller
                 'token_configured' => $client->configured($integration),
             ] : null,
             'workspaceId' => $workspaceId,
+            'stagedReview' => (string) ($request->user()->currentWorkspace?->getAttribute('review_mode') ?? 'off') !== 'off',
             'canManage' => $request->user()->hasAllPermissions(['workspace.settings.manage'], $workspaceId),
             'selectedPostId' => $selectedId,
             'source' => $request->query('source') === 'airtable' ? 'airtable' : 'dashboard',

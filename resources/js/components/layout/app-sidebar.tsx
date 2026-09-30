@@ -68,6 +68,8 @@ import { index as brandRoute } from '@/routes/content/brand';
 import { index as engagementRoute } from '@/routes/engagement';
 import { index as messagesRoute } from '@/routes/messages';
 import { index as postsRoute } from '@/routes/posts';
+import { index as reviewsRoute } from '@/routes/reviews';
+import { index as schedulingRoute } from '@/routes/scheduling';
 
 type NavItem = {
     title: string;
@@ -100,6 +102,12 @@ const postsNavItems: NavItem[] = [
     { title: 'Airtable workspace', href: airtableRoute(), icon: Blocks },
     { title: 'Posts', href: postsRoute(), icon: Inbox },
     { title: 'Brand & ideas', href: brandRoute(), icon: Pencil },
+    { title: 'Review queue', href: reviewsRoute(), icon: ListChecks },
+    {
+        title: 'Editorial schedules',
+        href: schedulingRoute(),
+        icon: CalendarDays,
+    },
     { title: 'Calendar', href: calendarRoute(), icon: CalendarDays },
     {
         title: 'Queue',

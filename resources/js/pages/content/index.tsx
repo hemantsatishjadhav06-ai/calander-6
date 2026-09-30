@@ -1,6 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
+import { index as libraryIndex } from '@/actions/App/Http/Controllers/Content/ContentAssetLibraryController';
+import { index as boardIndex } from '@/actions/App/Http/Controllers/Content/ContentIdeaBoardController';
 import {
     BrandForm,
     Feedback,
@@ -9,6 +11,7 @@ import {
     selectStyle,
     TemplateForm,
 } from '@/components/content/content-forms';
+import { TemplateDraftButton } from '@/components/content/template-assignments';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +25,8 @@ import { index as templatesIndex } from '@/routes/content/templates';
 import type {
     BrandProfile,
     ContentAsset,
+    ContentAccount,
+    LibraryAsset,
     ContentIdea,
     ContentPage,
     ContentProject,
@@ -39,6 +44,8 @@ type Props = {
     templateOptions: { id: string; name: string }[];
     templates: ContentPage<ContentTemplate>;
     ideas: ContentPage<ContentIdea>;
+    accounts: ContentAccount[];
+    mediaAssets: LibraryAsset[];
     filters: { q: string; status: string; archived: boolean };
 };
 
@@ -304,6 +311,7 @@ function ContentWorkspace(props: Props) {
         { id: 'brand', label: 'Brand kit', href: brandIndex() },
         { id: 'templates', label: 'Templates', href: templatesIndex() },
         { id: 'ideas', label: 'Ideas', href: ideasIndex() },
+        { id: 'library', label: 'Asset library', href: libraryIndex() },
     ];
     const title = tabs.find((item) => item.id === tab)?.label ?? 'Brand kit';
     const filter = (values: Record<string, string | number>) =>
@@ -433,6 +441,8 @@ function ContentWorkspace(props: Props) {
                             <TemplateForm
                                 key={templates.total}
                                 projects={projects}
+                                accounts={props.accounts}
+                                mediaAssets={props.mediaAssets}
                                 workspaceId={props.workspaceId}
                             />
                         </div>
@@ -486,10 +496,18 @@ function ContentWorkspace(props: Props) {
                                             key={template.revision}
                                             template={template}
                                             projects={projects}
+                                            accounts={props.accounts}
+                                            mediaAssets={props.mediaAssets}
                                             workspaceId={props.workspaceId}
                                         />
                                     </div>
                                 </details>
+                                {!template.archived_at && (
+                                    <TemplateDraftButton
+                                        template={template}
+                                        workspaceId={props.workspaceId}
+                                    />
+                                )}
                                 <p className="text-xs text-muted-foreground">
                                     Choose this template when creating an idea,
                                     or apply its saved design in the creator.
@@ -502,6 +520,15 @@ function ContentWorkspace(props: Props) {
             )}
             {tab === 'ideas' && (
                 <>
+                    <Link
+                        href={boardIndex()}
+                        className={buttonVariants({
+                            variant: 'outline',
+                            className: 'justify-self-start',
+                        })}
+                    >
+                        Open Kanban board
+                    </Link>
                     <details className="rounded-2xl border bg-card p-5">
                         <summary className="cursor-pointer font-semibold">
                             Capture a new idea
@@ -515,10 +542,10 @@ function ContentWorkspace(props: Props) {
                         </div>
                     </details>
                     <p className="text-sm text-muted-foreground">
-                        Converting an idea creates an unscheduled draft with no
-                        selected destinations. Internal briefs stay private;
-                        finish and submit the draft for review before
-                        publishing.
+                        Converting an idea creates an unscheduled draft using
+                        its template’s saved destinations and media, when
+                        selected. Internal briefs stay private; finish and
+                        submit the draft for review before publishing.
                     </p>
                     {ideas.data.length === 0 && (
                         <p className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">

@@ -59,11 +59,14 @@ function draftState(overrides: Partial<ComposerState> = {}): ComposerState {
 function Harness({
     state,
     onSaved,
+    workspaceId,
 }: {
+    workspaceId?: string;
     state: ComposerState;
     onSaved: () => void;
 }) {
     const { flush } = useAutosave({
+        workspaceId,
         state,
         accountIds: [],
         dispatch: vi.fn(),
@@ -218,5 +221,46 @@ describe('autosave debounce reset on placement-only changes', () => {
             segment_ref: '__head__',
             position: 0,
         });
+    });
+});
+
+describe('draft company context', () => {
+    it('sends the originating page company when creating a draft without accounts', async () => {
+        act(() => {
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: null,
+                        destination: { kind: 'none' },
+                    }),
+                    workspaceId: 'company-a',
+                    onSaved: vi.fn(),
+                }),
+            );
+        });
+        await act(async () => {
+            await flushRef?.();
+        });
+        expect(transform.mock.calls[0][0]()).toMatchObject({
+            expected_workspace_id: 'company-a',
+            destination: { kind: 'none' },
+        });
+    });
+    it('does not treat a rejected stale-company save as a saved draft', async () => {
+        const onSaved = vi.fn();
+        httpPost.mockRejectedValue(new Error('The active company changed'));
+        act(() => {
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({ postId: null }),
+                    workspaceId: 'company-a',
+                    onSaved,
+                }),
+            );
+        });
+        await act(async () => {
+            await flushRef?.();
+        });
+        expect(onSaved).not.toHaveBeenCalled();
     });
 });

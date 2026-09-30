@@ -58,7 +58,7 @@ abstract class WorkspaceTool extends Tool
         // been removed from (or left) the bound workspace, deny even though a stale
         // grant row still exists. The web path re-checks membership on every policy
         // call; this gives MCP the same guarantee.
-        if ($user === null || ! $user->isMemberOfWorkspace($workspaceId)) {
+        if ($user === null || ! $user->hasAllPermissions(['workspace.read'], $workspaceId)) {
             return null;
         }
 

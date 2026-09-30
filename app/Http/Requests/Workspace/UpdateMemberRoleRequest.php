@@ -25,7 +25,7 @@ class UpdateMemberRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', Rule::in(['member', 'admin'])],
+            'role' => ['required', Rule::in(['member', 'admin', 'client'])],
         ];
     }
 }

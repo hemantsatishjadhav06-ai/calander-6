@@ -9,6 +9,7 @@ enum WorkspaceRole: string
     case Owner = 'owner';
     case Admin = 'admin';
     case Member = 'member';
+    case Client = 'client';
 
     /**
      * @return array<int, string>
@@ -30,6 +31,6 @@ enum WorkspaceRole: string
      */
     public static function assignable(): array
     {
-        return [self::Admin, self::Member];
+        return [self::Admin, self::Member, self::Client];
     }
 }

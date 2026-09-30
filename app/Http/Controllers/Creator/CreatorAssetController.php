@@ -20,7 +20,7 @@ class CreatorAssetController extends Controller
     {
         abort_unless($request->user()->can('viewAny', CreatorAsset::class), 403);
         $search = trim((string) $request->validated('search', ''));
-        $assets = CreatorAsset::query()->where('workspace_id', $request->user()->current_workspace_id)
+        $assets = CreatorAsset::query()->where('workspace_id', $request->user()->current_workspace_id)->whereNull('archived_at')
             ->when($search !== '', fn ($query) => $query->whereLike('name', '%'.$search.'%'))
             ->orderByDesc('created_at')->orderByDesc('id')
             ->cursorPaginate(50, ['*'], 'cursor', $request->validated('cursor'));

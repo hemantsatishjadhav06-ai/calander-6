@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { TemplateAssignments } from '@/components/content/template-assignments';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,9 @@ import type {
     ContentIdea,
     ContentProject,
     ContentTemplate,
+    ContentAccount,
+    LibraryAsset,
+    TemplateDestination,
 } from '@/types/content';
 
 export function splitList(value: string): string[] {
@@ -297,10 +301,14 @@ export function BrandForm({
 export function TemplateForm({
     template,
     projects,
+    accounts = [],
+    mediaAssets = [],
     workspaceId,
 }: {
     template?: ContentTemplate;
     projects: ContentProject[];
+    accounts?: ContentAccount[];
+    mediaAssets?: LibraryAsset[];
     workspaceId: string;
 }) {
     const [form, setForm] = useState({
@@ -312,6 +320,9 @@ export function TemplateForm({
         first_comment: template?.first_comment ?? '',
         project: '__keep__',
         archived: Boolean(template?.archived_at),
+        destination:
+            template?.destination ?? ({ kind: 'none' } as TemplateDestination),
+        media_asset_ids: template?.media_asset_ids ?? [],
     });
     const mutation = useContentMutation();
     const patch = (field: string, value: string | boolean) =>
@@ -403,6 +414,21 @@ export function TemplateForm({
                         }
                     />
                 </Field>
+                <TemplateAssignments
+                    accounts={accounts}
+                    assets={mediaAssets}
+                    destination={form.destination}
+                    mediaIds={form.media_asset_ids}
+                    onDestination={(destination) =>
+                        setForm((previous) => ({ ...previous, destination }))
+                    }
+                    onMedia={(media_asset_ids) =>
+                        setForm((previous) => ({
+                            ...previous,
+                            media_asset_ids,
+                        }))
+                    }
+                />
                 <Field label="Design snapshot">
                     <select
                         className={selectStyle}

@@ -29,6 +29,9 @@ return [
                     'workspace.accounts.manage',
                 ],
             ],
+            'client' => [
+                'permissions' => ['workspace.review.client'],
+            ],
             'member' => [
                 'permissions' => [
                     'workspace.read',

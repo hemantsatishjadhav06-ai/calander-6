@@ -5,6 +5,7 @@ use App\Console\Commands\DispatchDueMessageFetches;
 use App\Console\Commands\DispatchDuePosts;
 use App\Console\Commands\DispatchDueReplyFetches;
 use App\Console\Commands\DispatchDueReposts;
+use App\Console\Commands\ProcessEditorialSchedules;
 use App\Console\Commands\PruneAbandonedUploads;
 use App\Console\Commands\PruneMcpBindings;
 use App\Console\Commands\PruneUsageEvents;
@@ -20,6 +21,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Schedule::command(ProcessEditorialSchedules::class)->everyMinute()->withoutOverlapping();
 Schedule::command(DispatchDuePosts::class)->everyMinute()->withoutOverlapping();
 Schedule::command(RefreshExpiringTokens::class)->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command(PruneMcpBindings::class)->hourly();

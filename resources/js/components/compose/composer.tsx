@@ -189,7 +189,7 @@ export default function Composer({
 }: ComposerProps) {
     const schedulingTz = useSchedulingTimezone();
     const confirm = useConfirm();
-    const { shell } = usePage().props;
+    const { shell, workspaces } = usePage().props;
     const saveMentionHttp = useHttp<
         Record<string, never>,
         { mention: WorkspaceMention }
@@ -246,6 +246,7 @@ export default function Composer({
     );
     const selectedVideoLimits = videoLimitsForTargets(limits, tabAccounts);
     const { flush, ensurePost } = useAutosave({
+        workspaceId: workspaces?.current?.id,
         state,
         accountIds: destinationAccountIds,
         dispatch,
@@ -1160,6 +1161,17 @@ export default function Composer({
                 </div>
 
                 {/* Override banner (inside EditorBody) + editor */}
+                {state.saveState === 'workspace_changed' && (
+                    <div
+                        role="alert"
+                        className="border-b border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                    >
+                        Your active company changed in another tab. Your text is
+                        still here. Switch back to{' '}
+                        {workspaces?.current?.name ?? 'this company'} before
+                        saving, or copy your text before reloading.
+                    </div>
+                )}
                 {state.media.some(
                     (media) =>
                         media.creator_export &&

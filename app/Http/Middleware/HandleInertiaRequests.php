@@ -12,6 +12,7 @@ use App\Models\PostTargetReply;
 use App\Models\User;
 use App\Models\WorkspaceMembership;
 use App\Services\Gifs\KlipyClient;
+use App\Services\Reviews\ClientReviewAccess;
 use App\Support\CommunityStats;
 use App\Support\FeedbackConfig;
 use App\Support\InstanceSettings;
@@ -54,6 +55,11 @@ class HandleInertiaRequests extends Middleware
     #[Override]
     public function share(Request $request): array
     {
+        $clientReviewAccess = app(ClientReviewAccess::class);
+        if ($clientReviewAccess->isClient($request->user())) {
+            return [...parent::share($request), ...$clientReviewAccess->shared($request)];
+        }
+
         // Resolve the update-check once per request and share it across the
         // three deferred sidebar props. A request-local closure (not an instance
         // property) keeps this safe under Octane where the middleware instance

@@ -7,12 +7,14 @@ namespace App\Http\Controllers\Posts;
 use App\Enums\PostStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
+use App\Models\Workspace;
 use App\Services\Billing\WorkspaceSubscriptionGate;
 use App\Services\Posts\NextSlotResolver;
 use App\Support\PostView;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PostQueueController extends Controller
 {
@@ -35,27 +37,31 @@ class PostQueueController extends Controller
             'scheduled_at' => ['nullable', 'date', 'after:now'],
         ]);
 
-        $availableSlots = $this->resolver->availableSlots($workspace);
-        $slot = $this->resolveRequestedSlot(
-            $availableSlots,
-            $validated['scheduled_at'] ?? null,
-        );
+        return DB::transaction(function () use ($request, $post, $workspace, $validated): JsonResponse {
+            Workspace::query()->whereKey($workspace->id)->lockForUpdate()->firstOrFail();
+            $post = Post::query()->lockForUpdate()->findOrFail($post->id);
+            $availableSlots = $this->resolver->availableSlots($workspace);
+            $slot = $this->resolveRequestedSlot(
+                $availableSlots,
+                $validated['scheduled_at'] ?? null,
+            );
 
-        if ($slot === null) {
+            if ($slot === null) {
+                return response()->json([
+                    'message' => $request->filled('scheduled_at')
+                        ? 'Choose an open slot from your posting queue.'
+                        : 'No open posting slot available. Add posting-schedule slots in settings.',
+                ], 422);
+            }
+
+            $post->scheduled_at = $slot;
+            $post->status = PostStatus::Scheduled;
+            $post->save();
+
             return response()->json([
-                'message' => $request->filled('scheduled_at')
-                    ? 'Choose an open slot from your posting queue.'
-                    : 'No open posting slot available. Add posting-schedule slots in settings.',
-            ], 422);
-        }
-
-        $post->scheduled_at = $slot;
-        $post->status = PostStatus::Scheduled;
-        $post->save();
-
-        return response()->json([
-            'post' => PostView::make($post->fresh(['targets.account', 'media'])),
-        ]);
+                'post' => PostView::make($post->fresh(['targets.account', 'media'])),
+            ]);
+        });
     }
 
     /**

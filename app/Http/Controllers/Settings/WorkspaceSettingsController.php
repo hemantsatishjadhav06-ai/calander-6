@@ -134,7 +134,7 @@ class WorkspaceSettingsController extends Controller
             ])->all()),
             'pendingInvitations' => $pending,
             'canManage' => $user->hasAllPermissions(['workspace.users.manage'], $workspace->id),
-            'availableRoles' => ['member', 'admin'],
+            'availableRoles' => ['member', 'admin', 'client'],
         ]);
     }
 

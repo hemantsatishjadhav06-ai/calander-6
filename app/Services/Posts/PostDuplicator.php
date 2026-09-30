@@ -9,6 +9,7 @@ use App\Models\ConnectedAccount;
 use App\Models\CreatorExport;
 use App\Models\Post;
 use App\Models\PostMedia;
+use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use App\Support\FileStorage;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class PostDuplicator
      */
     public function duplicate(Post $source): Post
     {
-        $source->loadMissing('media', 'targets');
+        $source->loadMissing('media', 'targets.placements');
 
         /** @var list<array{0: string, 1: string}> $copiedPaths */
         $copiedPaths = [];
@@ -168,15 +169,29 @@ class PostDuplicator
                 continue;
             }
 
-            PostTarget::create([
+            $copy = PostTarget::create([
                 'post_id' => $draft->id,
                 'connected_account_id' => $target->connected_account_id,
                 'platform' => $target->platform->value,
                 'sections' => $target->sections,
+                'segment_breaks' => $target->segment_breaks,
+                'section_sources' => $target->section_sources,
                 'content_override' => $this->remapOverride($target->content_override, $mediaIdMap),
                 'auto_split' => $target->auto_split,
                 'format' => $target->format->value,
             ]);
+
+            foreach ($target->placements as $placement) {
+                $mediaId = $mediaIdMap[$placement->post_media_id] ?? null;
+                if ($mediaId !== null) {
+                    PostMediaPlacement::create([
+                        'post_target_id' => $copy->id,
+                        'post_media_id' => $mediaId,
+                        'segment_ref' => $placement->segment_ref,
+                        'position' => $placement->position,
+                    ]);
+                }
+            }
         }
     }
 

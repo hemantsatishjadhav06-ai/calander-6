@@ -81,3 +81,7 @@ require __DIR__.'/content.php';
 
 require __DIR__.'/creator.php';
 require __DIR__.'/creator-generations.php';
+
+require __DIR__.'/scheduling.php';
+
+require __DIR__.'/reviews.php';

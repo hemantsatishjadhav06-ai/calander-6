@@ -17,6 +17,7 @@ use Override;
  * @property string $id
  * @property string $workspace_id
  * @property int $revision
+ * @property int $position
  * @property string $title
  * @property string|null $brief
  * @property string|null $caption
@@ -28,7 +29,7 @@ use Override;
  * @property string|null $draft_post_id
  * @property string|null $creator_project_id
  */
-#[Fillable(['workspace_id', 'created_by_id', 'title', 'brief', 'caption', 'category', 'tags', 'status', 'due_on', 'template_id', 'draft_post_id', 'creator_project_id', 'revision'])]
+#[Fillable(['workspace_id', 'created_by_id', 'title', 'brief', 'caption', 'category', 'tags', 'status', 'due_on', 'template_id', 'draft_post_id', 'creator_project_id', 'revision', 'position'])]
 class ContentIdea extends Model
 {
     /** @use HasFactory<ContentIdeaFactory> */
@@ -38,6 +39,6 @@ class ContentIdea extends Model
     #[Override]
     protected function casts(): array
     {
-        return ['revision' => 'integer', 'tags' => 'array', 'due_on' => 'immutable_date'];
+        return ['position' => 'integer', 'revision' => 'integer', 'tags' => 'array', 'due_on' => 'immutable_date'];
     }
 }

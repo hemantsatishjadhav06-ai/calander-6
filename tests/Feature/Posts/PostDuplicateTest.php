@@ -8,6 +8,7 @@ use App\Enums\WorkspaceRole;
 use App\Models\ConnectedAccount;
 use App\Models\Post;
 use App\Models\PostMedia;
+use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use App\Models\User;
 use App\Models\Workspace;
@@ -155,4 +156,25 @@ test('a post from another workspace cannot be duplicated', function (): void {
     $this->actingAs($other)
         ->post(route('posts.duplicate', $post))
         ->assertNotFound();
+});
+
+test('duplicating a thread preserves section breaks sources and remapped media placements', function (): void {
+    $post = publishedPostWithMediaAndTarget($this->workspace, $this->user);
+    $target = $post->targets()->firstOrFail();
+    $target->forceFill(['sections' => ['Head', 'Reply'], 'segment_breaks' => ['0'], 'section_sources' => [0, 1]])->save();
+    $head = $post->media()->firstOrFail();
+    Storage::disk('public')->put('media/reply.jpg', 'IMG2');
+    $reply = PostMedia::factory()->for($this->workspace)->create(['post_id' => $post->id, 'disk' => 'public', 'path' => 'media/reply.jpg', 'position' => 1]);
+    foreach ([[$head, '0', 0], [$reply, '1', 2]] as [$media, $segment, $position]) {
+        PostMediaPlacement::create(['post_target_id' => $target->id, 'post_media_id' => $media->id, 'segment_ref' => $segment, 'position' => $position]);
+    }
+    $this->actingAs($this->user)->post(route('posts.duplicate', $post))->assertRedirect();
+    $draft = Post::query()->where('status', PostStatus::Draft->value)->firstOrFail();
+    $copy = $draft->targets()->firstOrFail();
+    $media = $draft->media()->orderBy('position')->get();
+    expect($copy->sections)->toBe(['Head', 'Reply'])
+        ->and($copy->segment_breaks)->toBe(['0'])
+        ->and($copy->section_sources)->toBe([0, 1])
+        ->and($copy->placements()->orderBy('segment_ref')->get()->map(fn ($placement) => [$placement->post_media_id, $placement->segment_ref, $placement->position])->all())
+        ->toBe([[$media[0]->id, '0', 0], [$media[1]->id, '1', 2]]);
 });

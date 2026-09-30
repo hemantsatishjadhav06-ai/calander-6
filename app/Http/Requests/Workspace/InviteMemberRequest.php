@@ -35,7 +35,7 @@ class InviteMemberRequest extends FormRequest
                         ->where('expires_at', '>', now())
                 ),
             ],
-            'role' => ['required', Rule::in(['member', 'admin'])],
+            'role' => ['required', Rule::in(['member', 'admin', 'client'])],
         ];
     }
 }

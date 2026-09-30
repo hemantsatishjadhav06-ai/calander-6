@@ -12,6 +12,8 @@ use App\Models\PostTarget;
 use App\Models\PostWorkflowEvent;
 use App\Models\User;
 use App\Services\Creator\CreatorExportFreshness;
+use App\Services\Reviews\StagedPostReviewService;
+use App\Services\Scheduling\EditorialPublishingGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -52,6 +54,11 @@ class PostReviewService
 
     public function status(Post $post): string
     {
+        $staged = app(StagedPostReviewService::class)->status($post);
+        if ($staged !== null) {
+            return $staged;
+        }
+
         if (! $post->getAttribute('review_required')) {
             return 'not_required';
         }
@@ -65,12 +72,18 @@ class PostReviewService
 
     public function canPublish(Post $post): bool
     {
-        return ! app(CreatorExportFreshness::class)->hasStaleExports($post)
+        return app(EditorialPublishingGuard::class)->allows($post)
+            && ! app(CreatorExportFreshness::class)->hasStaleExports($post)
             && in_array($this->status($post), ['not_required', 'approved'], true);
     }
 
     public function act(Post $post, User $actor, string $action, string $revision, ?string $note, string $source): Post
     {
+        $staged = app(StagedPostReviewService::class);
+        if ($staged->mode($post) !== 'off') {
+            return $staged->act($post, $actor, $action, $revision, $note, $source);
+        }
+
         abort_unless($actor->hasAllPermissions(['workspace.read'], $post->workspace_id), 403);
         if ($action !== 'submit') {
             abort_unless($actor->hasAllPermissions(['workspace.settings.manage'], $post->workspace_id), 403);

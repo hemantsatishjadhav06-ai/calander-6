@@ -30,6 +30,12 @@ class SaveContentTemplateRequest extends FormRequest
             'first_comment' => ['nullable', 'string', 'max:5000'],
             'source_project_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('creator_projects', 'id')->where('workspace_id', $this->user()->current_workspace_id)],
             'source_project_revision' => ['nullable', 'required_with:source_project_id', 'integer', 'min:1'],
+            'destination' => ['sometimes', 'array:kind,ids'],
+            'destination.kind' => ['required_with:destination', Rule::in(['none', 'default', 'accounts'])],
+            'destination.ids' => ['required_if:destination.kind,accounts', 'array', 'list', 'max:50'],
+            'destination.ids.*' => ['required', 'uuid', 'distinct', Rule::exists('connected_accounts', 'id')->where('workspace_id', $this->user()->current_workspace_id)->whereNull('disabled_at')],
+            'media_asset_ids' => ['sometimes', 'array', 'list', 'max:20'],
+            'media_asset_ids.*' => ['required', 'uuid', 'distinct', Rule::exists('creator_assets', 'id')->where('workspace_id', $this->user()->current_workspace_id)],
             'archived' => ['sometimes', 'boolean'],
         ];
     }

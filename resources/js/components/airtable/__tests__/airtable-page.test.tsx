@@ -74,6 +74,7 @@ const props = {
     integration,
     workspaceId: 'workspace-1',
     canManage: true,
+    stagedReview: false,
     selectedPostId: 'post-1',
     source: 'airtable' as const,
     posts: [post],
@@ -229,4 +230,16 @@ it('shows persistent errors and prevents sync during a server cooldown', () => {
     expect(calls.reload).toHaveBeenCalledWith({
         only: ['integration', 'posts', 'audit'],
     });
+});
+
+it('routes staged reviews to the per-account review queue without legacy approval controls', () => {
+    render(<AirtableWorkspace {...props} stagedReview />);
+    expect(
+        screen
+            .getByRole('link', { name: 'Open review queue' })
+            .getAttribute('href'),
+    ).toContain('/reviews?post=post-1');
+    expect(
+        screen.queryByRole('button', { name: 'Approve this revision' }),
+    ).toBeNull();
 });

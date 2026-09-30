@@ -16,5 +16,5 @@ test('member role is read only', function () {
 test('assignable roles exclude owner', function () {
     $values = array_map(fn ($r) => $r->value, WorkspaceRole::assignable());
 
-    $this->assertSame(['admin', 'member'], $values);
+    $this->assertSame(['admin', 'member', 'client'], $values);
 });

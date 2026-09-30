@@ -25,6 +25,8 @@ export type ContentTemplate = {
     source_project_revision: number | null;
     archived_at: string | null;
     has_design: boolean;
+    destination?: TemplateDestination | null;
+    media_asset_ids?: string[] | null;
 };
 export type ContentIdea = {
     id: string;
@@ -40,6 +42,7 @@ export type ContentIdea = {
     creator_project_id: string | null;
     revision: number;
     post_url: string | null;
+    position?: number;
 };
 export type ContentProject = { id: string; name: string; revision: number };
 export type ContentPage<T> = {
@@ -49,4 +52,27 @@ export type ContentPage<T> = {
     last_page: number;
     prev_page_url: string | null;
     next_page_url: string | null;
+};
+
+export type LibraryAsset = ContentAsset & {
+    workspace_id: string;
+    kind: 'image' | 'logo';
+    mime: string;
+    size_bytes: number;
+    width: number;
+    height: number;
+    folder: string | null;
+    tags: string[];
+    starred: boolean;
+    archived_at: string | null;
+    revision: number;
+    version: number;
+    root_asset_id: string | null;
+    parent_asset_id: string | null;
+    created_at: string | null;
+};
+export type ContentAccount = { id: string; name: string; platform: string };
+export type TemplateDestination = {
+    kind: 'none' | 'default' | 'accounts';
+    ids?: string[];
 };

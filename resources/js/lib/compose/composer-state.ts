@@ -24,6 +24,7 @@ export function segmentRefsFromBreaks(breaks: string[]): string[] {
 }
 
 export type SaveState =
+    | 'workspace_changed'
     | 'idle'
     | 'dirty'
     | 'saving'
@@ -98,6 +99,7 @@ export type ComposerAction =
     | { type: 'saveSkippedEmpty' }
     | { type: 'saveSucceeded'; post: PostView }
     | { type: 'saveFailedOffline' }
+    | { type: 'saveFailedWorkspace' }
     | { type: 'saveFailedStale'; post: PostView }
     | { type: 'resolveConflictUseServer' }
     | { type: 'resolveConflictKeepMine' };
@@ -800,6 +802,9 @@ export function composerReducer(
 
         case 'saveFailedOffline':
             return { ...state, saveState: 'offline' };
+
+        case 'saveFailedWorkspace':
+            return { ...state, saveState: 'workspace_changed' };
 
         case 'saveFailedStale':
             // A stale-write 409 whose server content is byte-identical to the

@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index, resolve, sync, update } from '@/routes/airtable';
 import { review, show } from '@/routes/posts';
+import { index as reviewQueue } from '@/routes/reviews';
 import type { MediaView } from '@/types/compose';
 
 type Integration = {
@@ -52,6 +53,7 @@ type Props = {
     integration: Integration | null;
     workspaceId: string;
     canManage: boolean;
+    stagedReview: boolean;
     selectedPostId: string;
     source: 'dashboard' | 'airtable';
     posts: ReviewPost[];
@@ -72,11 +74,13 @@ function formatDate(value: string | null) {
 function ReviewCard({
     post,
     canManage,
+    stagedReview,
     source,
     selected,
 }: {
     post: ReviewPost;
     canManage: boolean;
+    stagedReview: boolean;
     source: Props['source'];
     selected: boolean;
 }) {
@@ -202,7 +206,15 @@ function ReviewCard({
                         For thread placement and per-account media variants,
                         inspect the full composer before approving.
                     </p>
-                    {canReview && (
+                    {canReview && stagedReview && (
+                        <Link
+                            href={reviewQueue({ query: { post: post.id } })}
+                            className={buttonVariants({ variant: 'outline' })}
+                        >
+                            Open review queue
+                        </Link>
+                    )}
+                    {canReview && !stagedReview && (
                         <>
                             <Label htmlFor={`note-${post.id}`}>
                                 Review note
@@ -327,6 +339,7 @@ export default function AirtableWorkspace({
     integration,
     workspaceId,
     canManage,
+    stagedReview,
     selectedPostId,
     source,
     posts,
@@ -760,6 +773,7 @@ export default function AirtableWorkspace({
                             post={post}
                             source={source}
                             canManage={canManage}
+                            stagedReview={stagedReview}
                             selected={post.id === selectedPostId}
                         />
                     ))}

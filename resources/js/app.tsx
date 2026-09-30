@@ -27,6 +27,7 @@ void createInertiaApp({
     layout: (name) => {
         switch (true) {
             // Public, unauthenticated share viewer — no app shell/sidebar.
+            case name === 'reviews/client':
             case name.startsWith('share/'):
                 return null;
             case name === 'error':

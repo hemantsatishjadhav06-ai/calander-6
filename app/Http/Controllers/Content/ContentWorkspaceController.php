@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Content\SaveBrandProfileRequest;
 use App\Http\Requests\Content\SaveContentIdeaRequest;
 use App\Http\Requests\Content\SaveContentTemplateRequest;
+use App\Models\ConnectedAccount;
 use App\Models\ContentIdea;
 use App\Models\ContentTemplate;
 use App\Models\CreatorAsset;
@@ -16,6 +17,7 @@ use App\Models\Post;
 use App\Models\Workspace;
 use App\Models\WorkspaceBrandProfile;
 use App\Services\Content\BrandPromptBuilder;
+use App\Services\Content\ContentTemplateDraftService;
 use App\Services\Content\ContentWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -44,6 +46,8 @@ class ContentWorkspaceController extends Controller
             'brand' => $this->brand($workspaceId),
             'logos' => CreatorAsset::query()->where('workspace_id', $workspaceId)->where('kind', 'logo')->latest()->limit(100)->get()->map(fn (CreatorAsset $asset): array => $asset->toView())->all(),
             'projects' => CreatorProject::query()->where('workspace_id', $workspaceId)->latest('updated_at')->limit(100)->get(['id', 'name', 'revision'])->toArray(),
+            'accounts' => ConnectedAccount::query()->where('workspace_id', $workspaceId)->enabled()->orderBy('display_name')->get()->map(fn (ConnectedAccount $account): array => ['id' => $account->id, 'name' => $account->display_name ?: $account->handle, 'platform' => $account->platform->value])->all(),
+            'mediaAssets' => CreatorAsset::query()->where('workspace_id', $workspaceId)->orderBy('name')->get()->map(fn (CreatorAsset $asset): array => $asset->toView())->all(),
             'templateOptions' => ContentTemplate::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->orderBy('name')->get(['id', 'name'])->toArray(),
             'templates' => ContentTemplate::query()->where('workspace_id', $workspaceId)
                 ->when(! ($filters['archived'] ?? false), fn ($builder) => $builder->whereNull('archived_at'))
@@ -97,6 +101,16 @@ class ContentWorkspaceController extends Controller
         $project = $workflows->instantiate($request->user(), $contentTemplate, (int) $data['expected_revision']);
 
         return response()->json(['project' => $project->toView()], 201);
+    }
+
+    public function draftTemplate(Request $request, ContentTemplate $contentTemplate, ContentTemplateDraftService $drafts): JsonResponse
+    {
+        $workspaceId = $this->workspaceId($request);
+        abort_unless($request->user()->can('create', Post::class), 403);
+        $data = $request->validate(['expected_workspace_id' => ['required', 'uuid', Rule::in([$workspaceId])], 'expected_revision' => ['required', 'integer', 'min:1']]);
+        $post = $drafts->create($request->user(), $contentTemplate, (int) $data['expected_revision']);
+
+        return response()->json(['post_id' => $post->id, 'post_url' => route('posts.show', $post), 'creator_project_id' => $post->getAttribute('content_creator_project_id')], 201);
     }
 
     public function storeIdea(SaveContentIdeaRequest $request, ContentWorkflowService $workflows): JsonResponse|RedirectResponse
@@ -155,12 +169,12 @@ class ContentWorkspaceController extends Controller
     /** @return array<string, mixed> */
     private function template(ContentTemplate $template): array
     {
-        return [...$template->only(['id', 'name', 'description', 'brief', 'caption', 'hashtags', 'first_comment', 'revision', 'source_project_id', 'source_project_revision', 'archived_at']), 'has_design' => $template->document !== null];
+        return [...$template->only(['id', 'name', 'description', 'brief', 'caption', 'hashtags', 'first_comment', 'revision', 'destination', 'media_asset_ids', 'source_project_id', 'source_project_revision', 'archived_at']), 'has_design' => $template->document !== null];
     }
 
     /** @return array<string, mixed> */
     private function idea(ContentIdea $idea): array
     {
-        return [...$idea->only(['id', 'title', 'brief', 'caption', 'category', 'tags', 'status', 'template_id', 'draft_post_id', 'creator_project_id', 'revision']), 'due_on' => $idea->due_on?->format('Y-m-d'), 'post_url' => $idea->draft_post_id ? route('posts.show', $idea->draft_post_id) : null];
+        return [...$idea->only(['id', 'title', 'brief', 'caption', 'category', 'tags', 'status', 'template_id', 'draft_post_id', 'creator_project_id', 'revision', 'position']), 'due_on' => $idea->due_on?->format('Y-m-d'), 'post_url' => $idea->draft_post_id ? route('posts.show', $idea->draft_post_id) : null];
     }
 }

@@ -1,5 +1,6 @@
 import { useHttp } from '@inertiajs/react';
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 import PostController from '@/actions/App/Http/Controllers/Posts/PostController';
 import {
@@ -16,6 +17,8 @@ export const AUTOSAVE_DEBOUNCE_MS = 500;
 type SaveResponse = { post: PostView };
 
 type UseAutosave = {
+    /** Originating page context, retained when another tab switches company. */
+    workspaceId?: string;
     state: ComposerState;
     accountIds: string[];
     dispatch: (action: ComposerAction) => void;
@@ -36,6 +39,7 @@ type UseAutosave = {
  * always reflects the latest reducer state, avoiding React state-timing bugs).
  */
 export function useAutosave({
+    workspaceId,
     state,
     accountIds,
     dispatch,
@@ -69,6 +73,7 @@ export function useAutosave({
      */
     async function createPost(): Promise<string> {
         http.transform(() => ({
+            ...(workspaceId ? { expected_workspace_id: workspaceId } : {}),
             segments: state.segments,
             mentions: state.mentions,
             destination: state.destination,
@@ -81,6 +86,12 @@ export function useAutosave({
             placements: flattenPlacements(state.placements),
         }));
         const created = await http.post(PostController.store().url, {
+            onError: (errors) => {
+                if (errors.expected_workspace_id) {
+                    toast.error(errors.expected_workspace_id);
+                    dispatch({ type: 'saveFailedWorkspace' });
+                }
+            },
             onNetworkError: () => dispatch({ type: 'saveFailedOffline' }),
         });
         postIdRef.current = created.post.id;

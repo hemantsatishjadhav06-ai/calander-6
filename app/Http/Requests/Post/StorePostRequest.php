@@ -24,6 +24,7 @@ class StorePostRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'expected_workspace_id' => ['sometimes', 'required', 'uuid', Rule::in([$this->user()->current_workspace_id])],
             'base_text' => ['sometimes', 'nullable', 'string'],
             'segments' => ['present', 'array'],
             'segments.*' => ['nullable', 'string'],
@@ -45,5 +46,11 @@ class StorePostRequest extends FormRequest
             'placements.*.segment_ref' => ['required', 'string'],
             'placements.*.position' => ['required', 'integer'],
         ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return ['expected_workspace_id.in' => 'Your active company changed in another tab. Reload before saving this draft.'];
     }
 }

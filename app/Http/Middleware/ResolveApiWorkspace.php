@@ -37,8 +37,8 @@ class ResolveApiWorkspace
             abort(401, 'This API key is not valid.');
         }
 
-        if (! $user->isMemberOfWorkspace($apiKey->workspace_id)) {
-            abort(403, 'You are no longer a member of this workspace.');
+        if (! $user->hasAllPermissions(['workspace.read'], $apiKey->workspace_id)) {
+            abort(403, 'You do not have API access to this workspace.');
         }
 
         Context::add('workspace_id', $apiKey->workspace_id);

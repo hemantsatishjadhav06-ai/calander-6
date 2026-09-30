@@ -25,6 +25,7 @@ export default function SaveIndicator({
                 'hidden shrink-0 items-center gap-1.5 pr-3 text-[11.5px] sm:flex',
                 state === 'dirty' && 'text-amber-700 dark:text-amber-500',
                 state === 'conflict' && 'text-destructive',
+                state === 'workspace_changed' && 'text-destructive',
                 state === 'offline' && 'text-amber-700 dark:text-amber-500',
             )}
         >
@@ -35,6 +36,7 @@ export default function SaveIndicator({
                     state === 'saving' && 'animate-pulse bg-blue-500',
                     state === 'dirty' && 'bg-amber-500',
                     state === 'conflict' && 'bg-destructive',
+                    state === 'workspace_changed' && 'bg-destructive',
                     state === 'offline' && 'bg-amber-500',
                 )}
             />
@@ -47,6 +49,9 @@ export function formatSaveLabel(
     state: SaveState,
     lastSavedAt: number | null,
 ): string {
+    if (state === 'workspace_changed') {
+        return 'Company changed — not saved';
+    }
     if (state === 'saving') {
         return 'Saving…';
     }
