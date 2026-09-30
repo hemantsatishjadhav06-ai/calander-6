@@ -17,9 +17,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Override;
 
 /**
+ * @property bool|null $first_comment_enabled
+ * @property string|null $first_comment
  * @property string $id
  * @property string $post_id
  * @property string $connected_account_id
@@ -61,6 +64,8 @@ use Override;
     'section_sources',
     'content_override',
     'auto_split',
+    'first_comment_enabled',
+    'first_comment',
     'format',
     'status',
     'remote_id',
@@ -97,6 +102,7 @@ class PostTarget extends Model
     {
         return [
             'platform' => Platform::class,
+            'first_comment_enabled' => 'boolean',
             'status' => PostTargetStatus::class,
             'sections' => 'array',
             'segment_breaks' => 'array',
@@ -121,6 +127,12 @@ class PostTarget extends Model
             'reply_fetched_at' => 'immutable_datetime',
             'reply_fetch_empty_streak' => 'integer',
         ];
+    }
+
+    /** @return HasOne<FirstCommentDelivery, $this> */
+    public function firstCommentDelivery(): HasOne
+    {
+        return $this->hasOne(FirstCommentDelivery::class);
     }
 
     /**

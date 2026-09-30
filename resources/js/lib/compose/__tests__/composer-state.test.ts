@@ -737,6 +737,8 @@ describe('buildPutBody', () => {
         expect(body.targets[0]).toEqual({
             connected_account_id: 'a1',
             auto_split: true,
+            first_comment_enabled: null,
+            first_comment: null,
             format: 'feed',
             content_override: null,
         });

@@ -27,12 +27,14 @@ class PostReviewService
             'segments' => $post->segments,
             'mentions' => $post->mentions,
             'auto_repost' => $post->auto_repost,
+            'first_comment' => [$post->first_comment_enabled, $post->first_comment],
             'targets' => $post->targets->sortBy('id')->map(fn (PostTarget $target): array => [
                 'account' => $target->connected_account_id,
                 'sections' => $target->sections,
                 'segment_breaks' => $target->segment_breaks,
                 'section_sources' => $target->section_sources,
                 'format' => $target->format->value,
+                'first_comment' => [$target->first_comment_enabled, $target->first_comment],
                 'override' => $target->content_override,
                 'placements' => $target->placements->sortBy('id')->map(fn (PostMediaPlacement $placement): array => [
                     $placement->post_media_id, $placement->segment_ref, $placement->position,

@@ -284,7 +284,7 @@ it('reconciles publication outcomes and does not silently requeue a manually uns
     $second = $scheduler->enqueue($queue, $cancelled, 50);
     $scheduler->fill($this->workspace);
     $published->forceFill(['status' => PostStatus::Published])->save();
-    $cancelled->forceFill(['status' => PostStatus::Draft, 'scheduled_at' => null])->save();
+    $cancelled->refresh()->forceFill(['status' => PostStatus::Draft, 'scheduled_at' => null])->save();
 
     expect($scheduler->fill($this->workspace))->toBe(0);
     expect($first->refresh()->status)->toBe('published')->and($second->refresh()->status)->toBe('cancelled');

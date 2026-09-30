@@ -31,6 +31,12 @@ export type ReviewPost = {
         handle: string | null;
         sections: string[];
         format: string;
+        first_comment?: {
+            enabled: boolean;
+            text: string;
+            supported: boolean;
+            reason: string | null;
+        };
         placements: {
             media_id: string;
             segment_ref: string;

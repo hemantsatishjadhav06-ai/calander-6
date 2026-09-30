@@ -77,19 +77,20 @@ class ContentTemplateDraftService
     {
         $workspaceId = (string) $actor->current_workspace_id;
         $brand = WorkspaceBrandProfile::query()->where('workspace_id', $workspaceId)->first();
-        $caption = trim($idea?->caption ?: ($template?->caption ?? ''));
-        $tags = array_values(array_unique([...($brand?->default_hashtags ?? []), ...($template?->hashtags ?? [])]));
+        $caption = trim($idea?->caption ?: ($template->caption ?? ''));
+        $tags = array_values(array_unique([...($brand->default_hashtags ?? []), ...($template->hashtags ?? [])]));
         if ($tags !== [] && $caption !== '') {
             $caption .= "\n\n".implode(' ', $tags);
         }
-        $destination = $this->destination($workspaceId, $template?->destination ?? ['kind' => 'none']);
+        $destination = $this->destination($workspaceId, $template->destination ?? ['kind' => 'none']);
         $drafts = app(DraftService::class);
         $accountIds = $drafts->resolveDestinationAccountIds($workspaceId, $destination);
-        abort_unless(count($accountIds) === count($destination['ids'] ?? []), 422, 'A template destination is disabled or unavailable. Update the template destinations.');
-        $assetIds = $template?->media_asset_ids ?? [];
+        $unavailableAccountIds = array_diff($destination['ids'] ?? [], $accountIds);
+        abort_if($unavailableAccountIds !== [], 422, 'A template destination is disabled or unavailable. Update the template destinations.');
+        $assetIds = $template->media_asset_ids ?? [];
         $assets = CreatorAsset::query()->where('workspace_id', $workspaceId)->whereIn('id', $assetIds)->get()->keyBy('id');
         abort_unless($assets->count() === count($assetIds), 422, 'A template media reference is no longer available in this workspace.');
-        $suggestedComment = $template?->first_comment ?? ($brand?->first_comment_enabled ? $brand->first_comment : null);
+        $suggestedComment = $template->first_comment ?? ($brand?->first_comment_enabled ? $brand->first_comment : null);
         $post = $drafts->createDraft($workspaceId, $actor, $destination, [$caption], data: DraftData::fromArray([
             'segments' => [$caption], 'first_comment' => $suggestedComment, 'first_comment_enabled' => false,
         ]));
@@ -111,7 +112,7 @@ class ContentTemplateDraftService
         }
         $drafts->syncTargets($post, $accountIds, [$caption], [], [], [], [], DraftData::fromArray(['segments' => [$caption], 'placements' => $placements]));
         $post->forceFill(['review_required' => true, 'review_status' => 'draft', 'review_revision' => null])->save();
-        $project = $template?->document !== null ? app(CreatorProjectService::class)->create($actor, ['name' => $idea?->title ?? $template->name, 'document' => $template->document]) : null;
+        $project = $template?->document !== null ? app(CreatorProjectService::class)->create($actor, ['name' => $idea->title ?? $template->name, 'document' => $template->document]) : null;
         if ($idea !== null) {
             $position = (int) ContentIdea::query()->where('workspace_id', $workspaceId)->where('status', 'drafted')->max('position') + 1;
             $idea->forceFill(['draft_post_id' => $post->id, 'creator_project_id' => $project?->id, 'status' => 'drafted', 'position' => $position, 'revision' => $idea->revision + 1])->save();
@@ -130,14 +131,14 @@ class ContentTemplateDraftService
      */
     private function destination(string $workspaceId, array $destination): array
     {
-        if (($destination['kind'] ?? '') === 'default') {
+        if ($destination['kind'] === 'default') {
             $set = AccountSet::query()->where('workspace_id', $workspaceId)->where('is_default', true)->first();
             $defaultId = Workspace::query()->whereKey($workspaceId)->value('default_connected_account_id');
             $ids = $set ? array_values($set->accounts()->where('connected_accounts.workspace_id', $workspaceId)->pluck('connected_accounts.id')->map(static fn (mixed $id): string => (string) $id)->all()) : ($defaultId ? [(string) $defaultId] : []);
             abort_if($ids === [], 422, 'Choose a default account or account set in this workspace, or select template destinations.');
             $destination = ['kind' => 'accounts', 'ids' => $ids];
         }
-        abort_unless(in_array($destination['kind'] ?? '', ['none', 'accounts'], true), 422, 'Choose valid template destinations.');
+        abort_unless(in_array($destination['kind'], ['none', 'accounts'], true), 422, 'Choose valid template destinations.');
         if ($destination['kind'] === 'none') {
             return ['kind' => 'none'];
         }

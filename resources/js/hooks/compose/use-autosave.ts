@@ -78,6 +78,15 @@ export function useAutosave({
             mentions: state.mentions,
             destination: state.destination,
             auto_repost: state.autoRepost,
+            first_comment_enabled: state.firstCommentEnabled,
+            first_comment: state.firstComment,
+            targets: accountIds.map((accountId) => ({
+                connected_account_id: accountId,
+                first_comment_enabled:
+                    state.firstCommentByAccount[accountId]?.enabled ?? null,
+                first_comment:
+                    state.firstCommentByAccount[accountId]?.text ?? null,
+            })),
             // Persist the thread structure and per-segment placements on the
             // very first save too, so a reload before the next autosave PUT
             // sees a consistent post (stale break ids would otherwise degrade

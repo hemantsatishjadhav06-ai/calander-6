@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use App\Services\Posts\PostReviewService;
+use App\Services\Publishing\FirstCommentService;
 use App\Services\Publishing\SegmentMediaResolver;
 use App\Services\Reviews\ClientReviewAccess;
 use App\Services\Reviews\StagedPostReviewService;
@@ -53,7 +54,7 @@ class ReviewWorkflowController extends Controller
         }
         $page = $query->paginate(20)->withQueryString();
         $visible = $page->getCollection()->filter(fn (Post $post): bool => ! $isClient || $staged->canClientView($post, $actor));
-        $page->setCollection($visible->map(fn (Post $post): array => $this->present($post, $actor, $staged, $reviews)));
+        $presented = $visible->map(fn (Post $post): array => $this->present($post, $actor, $staged, $reviews))->values()->all();
 
         return Inertia::render($isClient ? 'reviews/client' : 'reviews/index', [
             'workspaceName' => $workspace->name,
@@ -62,7 +63,7 @@ class ReviewWorkflowController extends Controller
             'mode' => (string) $workspace->getAttribute('review_mode'),
             'isClient' => $isClient,
             'canManage' => $actor->hasAllPermissions(['workspace.settings.manage'], $workspaceId),
-            'posts' => $page,
+            'posts' => [...$page->toArray(), 'data' => $presented],
             'clients' => $isClient ? [] : WorkspaceMembership::query()->where('workspace_id', $workspaceId)->where('role', WorkspaceRole::Client->value)
                 ->with('user')->get()->map(fn (WorkspaceMembership $membership): array => ['id' => $membership->user_id, 'name' => $membership->user->name])->values()->all(),
             'urls' => ['configure' => route('reviews.configure'), 'index' => route('reviews.index'), 'logout' => route('logout'), 'switchWorkspace' => route('workspaces.switch'), 'members' => $isClient ? null : route('settings.workspace.members')],
@@ -143,12 +144,17 @@ class ReviewWorkflowController extends Controller
             'publishing_status' => $post->status->value,
             'scheduled_at' => $post->scheduled_at?->toIso8601String(),
             'client_user_id' => $state?->client_user_id,
-            'on_hold' => $state?->on_hold ?? false,
+            'on_hold' => $state->on_hold ?? false,
             'targets' => $post->targets->map(fn (PostTarget $target): array => [
                 'id' => $target->id, 'platform' => $target->platform->value, 'handle' => $target->account?->handle,
                 'sections' => $target->sections, 'format' => $target->format->value,
+                'first_comment' => [
+                    'enabled' => app(FirstCommentService::class)->enabled($post, $target),
+                    'text' => app(FirstCommentService::class)->text($post, $target),
+                    ...app(FirstCommentService::class)->capability($target),
+                ],
                 'media_by_section' => $this->mediaBySection($post, $target),
-                'placements' => $target->placements->map(fn ($placement): array => ['media_id' => $placement->post_media_id, 'segment_ref' => $placement->segment_ref, 'position' => $placement->position])->values()->all(),
+                'placements' => $target->placements->map(fn (PostMediaPlacement $placement): array => ['media_id' => $placement->post_media_id, 'segment_ref' => $placement->segment_ref, 'position' => $placement->position])->values()->all(),
                 'internal_status' => in_array($status, ['stale', 'draft'], true) ? 'pending' : ($state?->target_states[$target->id]['internal'] ?? 'pending'),
                 'client_status' => in_array($status, ['stale', 'draft'], true) ? 'pending' : ($state?->target_states[$target->id]['client'] ?? 'pending'),
             ])->values()->all(),
@@ -165,10 +171,10 @@ class ReviewWorkflowController extends Controller
             $target->sections,
             $target->section_sources ?? [],
             $target->segment_breaks ?? [],
-            $target->placements->map(fn (PostMediaPlacement $placement): array => [
+            array_values($target->placements->map(fn (PostMediaPlacement $placement): array => [
                 'post_media_id' => $placement->post_media_id, 'segment_ref' => $placement->segment_ref, 'position' => $placement->position,
-            ])->values()->all(),
-            $post->media->values()->all(),
+            ])->all()),
+            array_values($post->media->all()),
         );
 
         return array_map(fn (array $media): array => array_map(fn (PostMedia $item): string => $item->id, $media), $resolved);

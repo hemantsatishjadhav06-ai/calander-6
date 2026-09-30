@@ -11,7 +11,7 @@ class ReviewActionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasSomePermissions(['workspace.read', 'workspace.review.client'], $this->user()?->current_workspace_id) ?? false;
+        return $this->user()?->hasSomePermissions(['workspace.read', 'workspace.review.client'], $this->user()->current_workspace_id) ?? false;
     }
 
     /** @return array<string, mixed> */

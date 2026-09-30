@@ -11,7 +11,7 @@ class ConfigureReviewWorkflowRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAllPermissions(['workspace.settings.manage'], $this->user()?->current_workspace_id) ?? false;
+        return $this->user()?->hasAllPermissions(['workspace.settings.manage'], $this->user()->current_workspace_id) ?? false;
     }
 
     /** @return array<string, mixed> */

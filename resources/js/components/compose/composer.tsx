@@ -69,6 +69,7 @@ import { ComposerToolbar } from './composer-toolbar';
 import { ConflictDialog } from './conflict-dialog';
 import DestinationSelector from './destination-selector';
 import EditorBody, { type EditorBodyHandle } from './editor-body';
+import { FirstCommentEditor } from './first-comment-editor';
 import { ImageEditor } from './image-editor';
 import { PlatformPreviewPanel } from './platform-preview-panel';
 import PlatformTabs from './platform-tabs';
@@ -1587,6 +1588,14 @@ export default function Composer({
                                 );
                             }
                         }}
+                    />
+                )}
+
+                {!readOnly && (
+                    <FirstCommentEditor
+                        state={state}
+                        dispatch={dispatch}
+                        accounts={tabAccounts}
                     />
                 )}
 

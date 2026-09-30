@@ -8,6 +8,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\Gifs\PostGifController;
 use App\Http\Controllers\Posts\CalendarController;
 use App\Http\Controllers\Posts\ComposerController;
+use App\Http\Controllers\Posts\FirstCommentRetryController;
 use App\Http\Controllers\Posts\NextSlotController;
 use App\Http\Controllers\Posts\PostController;
 use App\Http\Controllers\Posts\PostImageEditController;
@@ -74,6 +75,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::put('posts/{post}/schedule', [PostScheduleController::class, 'update'])->name('posts.schedule');
     Route::post('posts/{post}/queue', [PostQueueController::class, 'store'])->name('posts.queue');
     Route::post('posts/{post}/publish', [PublishController::class, 'store'])->name('posts.publish');
+    Route::post('posts/{post}/targets/{target}/first-comment/retry', [FirstCommentRetryController::class, 'store'])->middleware('throttle:10,1')->name('posts.targets.first-comment.retry');
     Route::post('posts/{post}/targets/{target}/retry', [PostTargetRetryController::class, 'store'])->name('posts.targets.retry');
     // Bypasses the queued job's own per-platform rate limiting (dispatchSync runs
     // inline, skipping queue middleware), so throttle here — each hit is a real,

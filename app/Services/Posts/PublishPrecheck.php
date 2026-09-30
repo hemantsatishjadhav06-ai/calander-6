@@ -10,6 +10,7 @@ use App\Models\PostMedia;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use App\Services\Creator\CreatorExportFreshness;
+use App\Services\Publishing\FirstCommentService;
 use App\Services\Publishing\SegmentMediaResolver;
 use Illuminate\Support\Collection;
 
@@ -51,6 +52,13 @@ class PublishPrecheck
                 ? $this->targetIssues($target, $media)
                 : ['empty'];
 
+            $comments = app(FirstCommentService::class);
+            $commentCapability = $comments->capability($target);
+            if ($comments->enabled($post, $target) && $commentCapability['supported']
+                && ($comments->text($post, $target) === '' || mb_strlen($comments->text($post, $target)) > $commentCapability['max_length'])) {
+                $issues[] = 'first_comment_invalid';
+            }
+
             if ($creatorStale) {
                 $issues[] = 'creator_export_stale';
             }
@@ -85,6 +93,7 @@ class PublishPrecheck
         $label = $platform->label();
 
         $messages = array_map(static fn (string $issue): string => match ($issue) {
+            'first_comment_invalid' => 'Add a first comment within the supported length or turn first-comment delivery off.',
             'review_required' => 'This content revision needs approval before publishing.',
             'creator_export_stale' => 'This design changed. Export its current revision or remove its outdated media before publishing.',
             'empty' => 'Add text or media before publishing.',

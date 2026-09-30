@@ -23,6 +23,7 @@ use App\Notifications\PublishFailedNotification;
 use App\Services\Billing\WorkspaceSubscriptionGate;
 use App\Services\Posts\PostReviewService;
 use App\Services\Publishing\BackoffSchedule;
+use App\Services\Publishing\FirstCommentService;
 use App\Services\Publishing\PostStatusRollup;
 use App\Services\Publishing\PublishConnectorRegistry;
 use App\Services\Publishing\SegmentMediaResolver;
@@ -283,6 +284,7 @@ class PublishPostTarget implements ShouldQueue
 
         app(PostStatusRollup::class)->recompute($target->post()->firstOrFail());
 
+        app(FirstCommentService::class)->dispatch($target);
         $this->notifyPublished($target);
     }
 
@@ -356,6 +358,7 @@ class PublishPostTarget implements ShouldQueue
                 return null;
             }
             $target->setRawAttributes($snapshot->getAttributes(), true);
+            app(FirstCommentService::class)->snapshot($post, $target, app(PostReviewService::class)->revision($post));
             $media = array_values($post->media->all());
             $placements = array_values($snapshot->placements
                 ->map(fn (PostMediaPlacement $p): array => [
@@ -436,6 +439,7 @@ class PublishPostTarget implements ShouldQueue
             'finished_at' => Date::now(),
         ])->save();
 
+        app(FirstCommentService::class)->dispatch($target);
         $this->notifyPublished($target);
     }
 

@@ -1,6 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 
 import Composer from '@/components/compose/composer';
+import { FirstCommentStatus } from '@/components/posts/first-comment-status';
 import { PostPageActions } from '@/components/posts/post-page-actions';
 import { PublishedPostView } from '@/components/posts/published-post-view';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,7 @@ export default function ComposePage({
                         initialSavedMentions={savedMentions}
                     />
                 )}
+                {post && <FirstCommentStatus post={post} />}
             </div>
         </>
     );

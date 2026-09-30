@@ -275,3 +275,16 @@ it('rejects policy changes from a stale company tab and exposes the staged Airta
     expect($this->workspace->fresh()->getAttribute('review_mode'))->toBe('internal_client')
         ->and($other->fresh()->getAttribute('review_mode'))->toBe('off');
 });
+
+it('shows effective opt-in first comments to both internal and client reviewers', function () {
+    $this->post->forceFill(['first_comment_enabled' => true, 'first_comment' => 'Default comment'])->save();
+    $this->target->forceFill(['first_comment' => 'Account-specific comment'])->save();
+    $this->revision = $this->reviews->revision($this->post);
+    $this->get(route('reviews.index'))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('posts.data.0.targets.0.first_comment.enabled', true)
+        ->where('posts.data.0.targets.0.first_comment.text', 'Account-specific comment')
+        ->where('posts.data.0.targets.0.first_comment.supported', true));
+    stagedApproveInternally($this);
+    $this->actingAs($this->client)->get(route('reviews.index'))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('posts.data.0.targets.0.first_comment.text', 'Account-specific comment'));
+});

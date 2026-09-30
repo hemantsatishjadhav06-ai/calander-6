@@ -41,12 +41,13 @@ final class RecurringDraftGenerator
                 if ($locked->state !== 'active') {
                     return 0;
                 }
-                $source = Post::withoutGlobalScopes()->where('workspace_id', $locked->workspace_id)->whereKey($locked->source_post_id)->first();
+                $source = Post::withoutGlobalScopes()->where('workspace_id', $locked->workspace_id)->whereKey($locked->source_post_id)->lockForUpdate()->first();
                 if ($source === null || $source->status === PostStatus::Deleted) {
                     $locked->forceFill(['state' => 'held', 'last_error' => 'The source post is unavailable. Choose another source before resuming.'])->save();
 
                     return 0;
                 }
+                $source->load(['media', 'targets.placements']);
                 if ($this->freshness->hasStaleExports($source)) {
                     $locked->forceFill(['last_error' => 'The source design changed. Export the current revision before generating more drafts.'])->save();
 

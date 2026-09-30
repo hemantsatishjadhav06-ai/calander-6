@@ -12,6 +12,7 @@ use App\Models\PostTarget;
 use App\Services\Creator\CreatorExportFreshness;
 use App\Services\Posts\PostReviewService;
 use App\Services\Posts\PostSplitter;
+use App\Services\Publishing\FirstCommentService;
 
 final class PostView
 {
@@ -20,7 +21,7 @@ final class PostView
      */
     public static function make(Post $post): array
     {
-        $post->loadMissing('targets.placements');
+        $post->loadMissing('targets.placements', 'targets.firstCommentDelivery');
         $reviews = app(PostReviewService::class);
         $creatorExports = collect(app(CreatorExportFreshness::class)->snapshot($post))->keyBy('media_id');
 
@@ -42,6 +43,8 @@ final class PostView
             'status' => $post->status->value,
             'scheduled_at' => $post->scheduled_at?->toIso8601String(),
             'auto_repost' => $post->auto_repost,
+            'first_comment_enabled' => $post->first_comment_enabled,
+            'first_comment' => $post->first_comment,
             'published_at' => $post->published_at?->toIso8601String(),
             'updated_at' => $post->updated_at->toIso8601String(),
             'destination' => self::destination($post),
@@ -63,6 +66,9 @@ final class PostView
                     ])->values()->all(),
                     'content_override' => $target->content_override,
                     'auto_split' => $target->auto_split,
+                    'first_comment_enabled' => $target->first_comment_enabled,
+                    'first_comment' => $target->first_comment,
+                    'first_comment_delivery' => app(FirstCommentService::class)->view($post, $target),
                     'format' => $target->format->value,
                     'status' => $target->status->value,
                     'error_kind' => $target->error_kind?->value,

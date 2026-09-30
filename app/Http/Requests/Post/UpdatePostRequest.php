@@ -62,6 +62,10 @@ class UpdatePostRequest extends FormRequest
             'placements.*.segment_ref' => ['required', 'string'],
             'placements.*.position' => ['required', 'integer'],
             'auto_repost' => ['sometimes', 'nullable', 'boolean'],
+            'first_comment_enabled' => ['sometimes', 'boolean'],
+            'first_comment' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'targets.*.first_comment_enabled' => ['sometimes', 'nullable', 'boolean'],
+            'targets.*.first_comment' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'expected_updated_at' => ['nullable', 'string'],
         ];
     }

@@ -1,6 +1,7 @@
 import { Link, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
+import { ReviewFirstComment } from '@/components/reviews/review-first-comment';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -254,6 +255,7 @@ export function ReviewCard({
                                     </p>
                                 ),
                         )}
+                        <ReviewFirstComment comment={target.first_comment} />
                         {staged && (
                             <p className="text-xs text-muted-foreground">
                                 Internal: {reviewLabel(target.internal_status)}

@@ -8,6 +8,7 @@ use App\Dto\Engagement\FetchedReply;
 use App\Dto\Engagement\ReplyActionResult;
 use App\Dto\Engagement\ReplyFetchResult;
 use App\Dto\Engagement\ReplyPostResult;
+use App\Enums\PostFormat;
 use App\Enums\UsageCategory;
 use App\Models\ConnectedAccount;
 use App\Models\PostTarget;
@@ -104,6 +105,34 @@ class InstagramEngagementConnector implements EngagementConnector
         }
 
         return ReplyFetchResult::ok($replies);
+    }
+
+    /** @param array<string, mixed> $credentials */
+    public function postFirstComment(ConnectedAccount $account, PostTarget $target, string $text, array $credentials): ReplyPostResult
+    {
+        if ($target->remote_id === null || $target->format === PostFormat::Story) {
+            return ReplyPostResult::unsupported('Instagram first comments require a published feed post or Reel.');
+        }
+        try {
+            $response = $this->http->connectTimeout(10)->timeout(30)->asForm()
+                ->post($this->baseUrl().'/'.$target->remote_id.'/comments', [
+                    'message' => $text,
+                    'access_token' => (string) ($credentials['access_token'] ?? ''),
+                ]);
+        } catch (ConnectionException) {
+            return ReplyPostResult::failed('Instagram comment delivery could not be confirmed.');
+        }
+        $this->meter(UsageCategory::ExternalApi, UsageOperation::REPLY_SEND, $account, $response);
+        if ($response->failed()) {
+            return match (true) {
+                $response->status() === 401 => ReplyPostResult::authExpired(),
+                $response->status() === 403 => ReplyPostResult::unsupported(),
+                $response->status() === 429 => ReplyPostResult::rateLimited(),
+                default => ReplyPostResult::failed(),
+            };
+        }
+
+        return ReplyPostResult::ok((string) $response->json('id', ''));
     }
 
     public function postReply(ConnectedAccount $account, PostTargetReply $parent, string $text, array $credentials, array $media = []): ReplyPostResult

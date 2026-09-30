@@ -25,7 +25,7 @@ class ContentWorkflowService
         return DB::transaction(function () use ($workspaceId, $data): WorkspaceBrandProfile {
             Workspace::query()->whereKey($workspaceId)->lockForUpdate()->firstOrFail();
             $brand = WorkspaceBrandProfile::query()->where('workspace_id', $workspaceId)->lockForUpdate()->first();
-            abort_unless(($brand?->revision ?? 0) === (int) $data['expected_revision'], 409, 'The brand profile changed. Reload before saving.');
+            abort_unless(($brand->revision ?? 0) === (int) $data['expected_revision'], 409, 'The brand profile changed. Reload before saving.');
             unset($data['expected_revision'], $data['expected_workspace_id']);
             $brand ??= new WorkspaceBrandProfile(['workspace_id' => $workspaceId, 'revision' => 0]);
             $brand->fill($data);

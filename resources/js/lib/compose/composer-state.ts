@@ -60,6 +60,12 @@ export type ComposerState = {
     scheduleTray: ScheduleTray;
     conflict: PostView | null;
     autoRepost: boolean | null;
+    firstCommentEnabled: boolean;
+    firstComment: string;
+    firstCommentByAccount: Record<
+        string,
+        { enabled: boolean | null; text: string | null }
+    >;
 };
 
 export type ComposerAction =
@@ -71,6 +77,13 @@ export type ComposerAction =
     | { type: 'setActiveTab'; tab: string }
     | { type: 'setDestination'; destination: Destination }
     | { type: 'setAutoRepost'; value: boolean | null }
+    | { type: 'setFirstComment'; enabled: boolean; text: string }
+    | {
+          type: 'setTargetFirstComment';
+          accountId: string;
+          enabled: boolean | null;
+          text: string | null;
+      }
     | { type: 'toggleAutoSplit'; accountId: string }
     | { type: 'setFormat'; accountId: string; format: PostFormat }
     | { type: 'disableAutoSplit'; accountIds: string[] }
@@ -161,6 +174,9 @@ export function initialComposerState(
             : { mode: 'now', pickedAt: null },
         conflict: null,
         autoRepost: null,
+        firstCommentEnabled: false,
+        firstComment: '',
+        firstCommentByAccount: {},
     };
 }
 
@@ -409,6 +425,17 @@ function hydrate(post: PostView): ComposerState {
         },
         conflict: null,
         autoRepost: post.auto_repost ?? null,
+        firstCommentEnabled: post.first_comment_enabled ?? false,
+        firstComment: post.first_comment ?? '',
+        firstCommentByAccount: Object.fromEntries(
+            post.targets.map((target) => [
+                target.connected_account_id,
+                {
+                    enabled: target.first_comment_enabled ?? null,
+                    text: target.first_comment ?? null,
+                },
+            ]),
+        ),
     };
 }
 
@@ -487,6 +514,27 @@ export function composerReducer(
             return {
                 ...state,
                 destination: action.destination,
+                saveState: 'dirty',
+            };
+
+        case 'setFirstComment':
+            return {
+                ...state,
+                firstCommentEnabled: action.enabled,
+                firstComment: action.text,
+                saveState: 'dirty',
+            };
+
+        case 'setTargetFirstComment':
+            return {
+                ...state,
+                firstCommentByAccount: {
+                    ...state.firstCommentByAccount,
+                    [action.accountId]: {
+                        enabled: action.enabled,
+                        text: action.text,
+                    },
+                },
                 saveState: 'dirty',
             };
 
@@ -846,6 +894,8 @@ export function composerReducer(
 export type PutTarget = {
     connected_account_id: string;
     auto_split: boolean;
+    first_comment_enabled: boolean | null;
+    first_comment: string | null;
     format: PostFormat;
     content_override: { segments: string[]; media_ids: string[] } | null;
     segment_breaks?: string[];
@@ -860,6 +910,8 @@ export type PutBody = {
     mentions: MentionPlaceholder[];
     expected_updated_at: string | null;
     auto_repost: boolean | null;
+    first_comment_enabled: boolean;
+    first_comment: string;
     segment_breaks: string[];
     placements: Placement[];
 };
@@ -913,6 +965,9 @@ export function buildPutBody(
         return {
             connected_account_id: accountId,
             auto_split: state.autoSplitByAccount[accountId] ?? true,
+            first_comment_enabled:
+                state.firstCommentByAccount[accountId]?.enabled ?? null,
+            first_comment: state.firstCommentByAccount[accountId]?.text ?? null,
             format: state.formatByAccount[accountId] ?? 'feed',
             content_override,
             ...(divergedPlacements !== undefined
@@ -932,6 +987,8 @@ export function buildPutBody(
         mentions: state.mentions,
         expected_updated_at: state.baselineUpdatedAt,
         auto_repost: state.autoRepost,
+        first_comment_enabled: state.firstCommentEnabled,
+        first_comment: state.firstComment,
         segment_breaks: state.segmentBreaks,
         placements: flattenPlacements(state.placements),
     };
@@ -947,6 +1004,22 @@ export function contentMatchesServer(
     state: ComposerState,
     post: PostView,
 ): boolean {
+    if (
+        state.firstCommentEnabled !== (post.first_comment_enabled ?? false) ||
+        state.firstComment !== (post.first_comment ?? '')
+    ) {
+        return false;
+    }
+    for (const target of post.targets) {
+        const local = state.firstCommentByAccount[target.connected_account_id];
+        if (
+            (local?.enabled ?? null) !==
+                (target.first_comment_enabled ?? null) ||
+            (local?.text ?? null) !== (target.first_comment ?? null)
+        ) {
+            return false;
+        }
+    }
     if (JSON.stringify(state.segments) !== JSON.stringify(post.segments)) {
         return false;
     }

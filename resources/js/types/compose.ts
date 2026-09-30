@@ -149,6 +149,29 @@ export type Placement = {
     position: number;
 };
 
+export type FirstCommentDelivery = {
+    enabled: boolean;
+    text: string;
+    supported: boolean;
+    reason: string | null;
+    max_length: number;
+    status:
+        | 'not_started'
+        | 'pending'
+        | 'sending'
+        | 'sent'
+        | 'retryable'
+        | 'blocked'
+        | 'uncertain'
+        | 'skipped';
+    attempts: number;
+    error_message: string | null;
+    remote_id: string | null;
+    sent_at: string | null;
+    next_attempt_at: string | null;
+    retry_url: string;
+};
+
 export type TargetView = {
     id: string;
     connected_account_id: string;
@@ -159,6 +182,9 @@ export type TargetView = {
     sections: string[];
     content_override: { segments?: string[]; media_ids?: string[] } | null;
     auto_split: boolean;
+    first_comment_enabled?: boolean | null;
+    first_comment?: string | null;
+    first_comment_delivery?: FirstCommentDelivery;
     format: PostFormat;
     issues: string[];
     status: TargetStatus;
@@ -183,6 +209,8 @@ export type PostView = {
     updated_at: string;
     scheduled_at: string | null;
     auto_repost: boolean | null;
+    first_comment_enabled?: boolean;
+    first_comment?: string | null;
     destination: { kind: string; id: string | null; ids?: string[] };
     targets: TargetView[];
     media: MediaView[];

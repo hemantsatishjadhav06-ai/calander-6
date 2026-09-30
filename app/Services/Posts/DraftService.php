@@ -50,6 +50,8 @@ class DraftService
                 'mentions' => $this->normalizeMentions($mentions),
                 'status' => PostStatus::Draft->value,
                 'auto_repost' => $autoRepost,
+                'first_comment_enabled' => $data->firstCommentEnabled ?? false,
+                'first_comment' => $data?->firstComment,
             ]);
 
             $accountIds = $this->resolveDestinationAccountIds($workspaceId, $destination);
@@ -223,6 +225,7 @@ class DraftService
                     'content_override' => $override,
                     'auto_split' => $autoSplit,
                     'format' => $format,
+                    ...array_intersect_key($data->targetsByAccount[$accountId] ?? [], array_flip(['first_comment_enabled', 'first_comment'])),
                 ],
             );
 
@@ -374,6 +377,13 @@ class DraftService
             // a partial update that omits `auto_repost` must not reset it to null.
             if ($data->autoRepostProvided) {
                 $attributes['auto_repost'] = $data->autoRepost;
+            }
+
+            if ($data->firstCommentEnabledProvided) {
+                $attributes['first_comment_enabled'] = $data->firstCommentEnabled;
+            }
+            if ($data->firstCommentProvided) {
+                $attributes['first_comment'] = $data->firstComment;
             }
 
             $post->forceFill($attributes)->save();

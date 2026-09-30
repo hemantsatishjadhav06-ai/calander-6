@@ -16,7 +16,7 @@ final class DraftData
      * @param  list<string>  $destinationIds
      * @param  list<string>  $mediaIds
      * @param  list<array{id: string, label: string, handles: array<string, string>}>  $mentions
-     * @param  array<string, array{auto_split?: bool, format?: string, content_override?: array{segments: list<string>, media_ids: list<string>}|null, placements?: list<array{media_id: string, segment_ref: string, position: int}>, segment_breaks?: list<string>}>  $targetsByAccount
+     * @param  array<string, array{auto_split?: bool, first_comment_enabled?: bool|null, first_comment?: string|null, format?: string, content_override?: array{segments: list<string>, media_ids: list<string>}|null, placements?: list<array{media_id: string, segment_ref: string, position: int}>, segment_breaks?: list<string>}>  $targetsByAccount
      * @param  list<string>  $segmentBreaks
      * @param  list<array{media_id: string, segment_ref: string, position: int}>  $placements
      */
@@ -59,6 +59,10 @@ final class DraftData
          * {@see $segmentBreaksProvided}.
          */
         public readonly bool $mediaIdsProvided = false,
+        public readonly bool $firstCommentEnabled = false,
+        public readonly ?string $firstComment = null,
+        public readonly bool $firstCommentEnabledProvided = false,
+        public readonly bool $firstCommentProvided = false,
     ) {}
 
     /**
@@ -71,6 +75,11 @@ final class DraftData
         $targetsByAccount = [];
         foreach (($payload['targets'] ?? []) as $target) {
             $entry = [];
+            foreach (['first_comment_enabled', 'first_comment'] as $field) {
+                if (array_key_exists($field, $target)) {
+                    $entry[$field] = $target[$field];
+                }
+            }
             if (array_key_exists('auto_split', $target)) {
                 $entry['auto_split'] = (bool) $target['auto_split'];
             }
@@ -107,6 +116,10 @@ final class DraftData
             segmentBreaksProvided: array_key_exists('segment_breaks', $payload),
             placementsProvided: array_key_exists('placements', $payload),
             mediaIdsProvided: array_key_exists('media_ids', $payload),
+            firstCommentEnabled: (bool) ($payload['first_comment_enabled'] ?? false),
+            firstComment: $payload['first_comment'] ?? null,
+            firstCommentEnabledProvided: array_key_exists('first_comment_enabled', $payload),
+            firstCommentProvided: array_key_exists('first_comment', $payload),
         );
     }
 

@@ -57,6 +57,8 @@ class PostsController extends Controller
         $this->authorize('create', Post::class);
 
         $validated = $request->validate([
+            'targets' => ['array'],
+            'targets.*.connected_account_id' => ['required', 'string'],
             'base_text' => ['present', 'nullable', 'string'],
             'segments' => ['array'],
             'segments.*' => ['string'],
@@ -72,6 +74,10 @@ class PostsController extends Controller
             'destination.kind' => ['required', Rule::in(['all', 'set', 'account'])],
             'destination.id' => ['nullable', 'string', 'required_if:destination.kind,set,account'],
             'auto_repost' => ['sometimes', 'nullable', 'boolean'],
+            'first_comment_enabled' => ['sometimes', 'boolean'],
+            'first_comment' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'targets.*.first_comment_enabled' => ['sometimes', 'nullable', 'boolean'],
+            'targets.*.first_comment' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ]);
 
         /** @var User $user */
@@ -88,6 +94,7 @@ class PostsController extends Controller
             $segments,
             $validated['mentions'] ?? [],
             $validated['auto_repost'] ?? null,
+            DraftData::fromArray($validated),
         );
 
         return response()->json(['post' => PostView::make($post->fresh(['targets.account', 'media']))], 201);
@@ -123,6 +130,10 @@ class PostsController extends Controller
             'media_ids' => ['array'],
             'media_ids.*' => ['string'],
             'auto_repost' => ['sometimes', 'nullable', 'boolean'],
+            'first_comment_enabled' => ['sometimes', 'boolean'],
+            'first_comment' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'targets.*.first_comment_enabled' => ['sometimes', 'nullable', 'boolean'],
+            'targets.*.first_comment' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'expected_updated_at' => ['nullable', 'string'],
         ]);
 

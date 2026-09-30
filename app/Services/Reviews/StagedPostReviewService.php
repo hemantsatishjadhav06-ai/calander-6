@@ -127,15 +127,11 @@ class StagedPostReviewService
                 $state->on_hold = false;
             } elseif ($action === 'hold') {
                 $state->on_hold = true;
-                $states = $state->target_states;
-                foreach ($states as &$target) {
-                    $target[$stage] = 'pending';
-                    if ($stage === 'internal') {
-                        $target['client'] = 'pending';
-                    }
+                $heldStates = [];
+                foreach ($state->target_states as $id => $target) {
+                    $heldStates[$id] = ['internal' => $stage === 'internal' ? 'pending' : $target['internal'], 'client' => 'pending'];
                 }
-                unset($target);
-                $state->target_states = $states;
+                $state->target_states = $heldStates;
             } elseif ($action === 'submit') {
                 abort_if($targetIds === [], 422, 'Choose at least one publishing destination before submitting for review.');
                 if ($state->mode === $mode && $state->policy_version === $this->policyVersion($locked) && $state->revision === $current && $this->allHaveStatus($state, 'internal', 'pending')) {
@@ -158,10 +154,10 @@ class StagedPostReviewService
                     if ($action === 'approve' && $states[$id][$stage] !== 'pending') {
                         throw ValidationException::withMessages(['review' => 'Resubmit the revision after addressing the requested changes.']);
                     }
-                    $states[$id][$stage] = $decision;
-                    if ($stage === 'internal') {
-                        $states[$id]['client'] = 'pending';
-                    }
+                    $states[$id] = [
+                        'internal' => $stage === 'internal' ? $decision : $states[$id]['internal'],
+                        'client' => $stage === 'internal' ? 'pending' : $decision,
+                    ];
                     $changed = true;
                 }
                 if (! $changed) {

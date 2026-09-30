@@ -49,6 +49,8 @@ class PostDuplicator
                     'mentions' => $source->mentions,
                     'status' => PostStatus::Draft->value,
                     'auto_repost' => $source->auto_repost,
+                    'first_comment_enabled' => $source->first_comment_enabled,
+                    'first_comment' => $source->first_comment,
                 ]);
 
                 $mediaIdMap = $this->createMediaRows($draft, $mediaPlan);
@@ -178,6 +180,8 @@ class PostDuplicator
                 'section_sources' => $target->section_sources,
                 'content_override' => $this->remapOverride($target->content_override, $mediaIdMap),
                 'auto_split' => $target->auto_split,
+                'first_comment_enabled' => $target->first_comment_enabled,
+                'first_comment' => $target->first_comment,
                 'format' => $target->format->value,
             ]);
 

@@ -19,6 +19,8 @@ use Illuminate\Support\Str;
 use Override;
 
 /**
+ * @property bool $first_comment_enabled
+ * @property string|null $first_comment
  * @property string $id
  * @property string $workspace_id
  * @property string|null $account_set_id
@@ -42,6 +44,8 @@ use Override;
     'mentions',
     'status',
     'auto_repost',
+    'first_comment_enabled',
+    'first_comment',
     'scheduled_at',
     'published_at',
     'deleted_at',
@@ -51,10 +55,13 @@ class Post extends Model
     /** @use HasFactory<PostFactory> */
     use HasFactory, HasUuids, HasWorkspaceScope;
 
+    protected $attributes = ['first_comment_enabled' => false];
+
     #[Override]
     protected function casts(): array
     {
         return [
+            'first_comment_enabled' => 'boolean',
             'status' => PostStatus::class,
             'auto_repost' => 'boolean',
             'mentions' => 'array',

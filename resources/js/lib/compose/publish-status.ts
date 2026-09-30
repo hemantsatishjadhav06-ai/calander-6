@@ -42,6 +42,13 @@ export function anyTargetActive(targets: TargetView[]): boolean {
 export function shouldPollPostStatus(post: PostView): boolean {
     return post.targets.some(
         (target) =>
+            (target.status === 'published' &&
+                (target.first_comment_delivery?.status === 'pending' ||
+                    target.first_comment_delivery?.status === 'sending' ||
+                    (target.first_comment_delivery?.status === 'retryable' &&
+                        Boolean(
+                            target.first_comment_delivery.next_attempt_at,
+                        )))) ||
             target.status === 'publishing' ||
             target.status === 'deleting' ||
             (post.status === 'publishing' && target.status === 'pending'),
