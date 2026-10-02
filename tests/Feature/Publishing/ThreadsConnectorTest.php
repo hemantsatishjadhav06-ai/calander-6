@@ -45,13 +45,13 @@ test('threads publishes a single text post through the container flow', function
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-1']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['media_type'] === 'TEXT'
         && $request['text'] === 'hello world'
         && ! isset($request['reply_to_id']));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads_publish')
         && $request['creation_id'] === 'container-1');
 });
 
@@ -73,8 +73,8 @@ test('threads publishes a 2-segment thread chaining reply_to_id and accumulates 
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-1', 'post-2']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['text'] === 'second'
         && $request['reply_to_id'] === 'post-1');
 
@@ -99,8 +99,8 @@ test('threads resumes a partial chain from persisted remote_ids, continuing at t
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-1', 'post-2']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['text'] === 'second'
         && $request['reply_to_id'] === 'post-1');
 
@@ -125,8 +125,8 @@ test('threads publishes a single image as an IMAGE container', function () {
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-1']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['media_type'] === 'IMAGE'
         && str_contains((string) $request['image_url'], 'pic.jpg')
         && $request['text'] === 'look at this');
@@ -150,8 +150,8 @@ test('threads publishes a caption-less image as an IMAGE container with empty te
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-1']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['media_type'] === 'IMAGE'
         && $request['text'] === '');
 });
@@ -175,10 +175,10 @@ test('threads returns a MediaProcessing failure while the container status is IN
         ->and($result->errorKind)->toBe(ErrorKind::MediaProcessing)
         ->and($result->retryAfter)->toBe(6);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/container-1')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/container-1')
         && ($request['fields'] ?? null) === 'status');
 
-    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'threads_publish'));
+    Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), 'threads_publish'));
 });
 
 test('threads builds a carousel from two images then publishes the parent container', function () {
@@ -203,13 +203,13 @@ test('threads builds a carousel from two images then publishes the parent contai
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-carousel']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && ($request['is_carousel_item'] ?? null) === 'true'
         && str_contains((string) ($request['image_url'] ?? ''), 'a.jpg'));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && ($request['media_type'] ?? null) === 'CAROUSEL'
         && ($request['children'] ?? null) === 'child-1,child-2'
         && ($request['text'] ?? null) === 'carousel caption');
@@ -232,8 +232,8 @@ test('threads publishes a video as a VIDEO container', function () {
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['video-post']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['media_type'] === 'VIDEO'
         && str_contains((string) $request['video_url'], 'clip.mp4'));
 });
@@ -285,8 +285,8 @@ test('threads delete removes every post in the chain', function () {
 
     app(ThreadsConnector::class)->delete($target, ['access_token' => 'tok']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/v1.0/post-1') && $request->method() === 'DELETE');
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/v1.0/post-2') && $request->method() === 'DELETE');
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/v1.0/post-1') && $request->method() === 'DELETE');
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/v1.0/post-2') && $request->method() === 'DELETE');
 });
 
 test('threads delete throws when Graph rejects the call (e.g. missing threads_delete)', function () {

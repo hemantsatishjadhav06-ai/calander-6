@@ -8,6 +8,7 @@ use App\Concerns\HasWorkspaceScope;
 use App\Enums\ConnectedAccountStatus;
 use App\Enums\MetricsStatus;
 use App\Enums\Platform;
+use App\Services\Posts\PostApprovalService;
 use Carbon\CarbonImmutable;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -67,6 +68,17 @@ class ConnectedAccount extends Model
 {
     /** @use HasFactory<ConnectedAccountFactory> */
     use HasFactory, HasUuids, HasWorkspaceScope;
+
+    #[Override]
+    protected static function booted(): void
+    {
+        static::updating(function (ConnectedAccount $account): void {
+            if ($account->isDirty(['remote_account_id', 'platform'])) {
+                Post::withoutGlobalScopes()->whereHas('targets', fn (Builder $query): Builder => $query->where('connected_account_id', $account->id))
+                    ->update(PostApprovalService::clearedReview());
+            }
+        });
+    }
 
     /**
      * X subscription tiers that unlock Premium limits (longer posts and video).

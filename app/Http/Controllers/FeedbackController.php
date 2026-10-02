@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
 
 class FeedbackController extends Controller
 {
-    public function __construct(private FeedbackService $feedback) {}
+    public function __construct(private readonly FeedbackService $feedback) {}
 
     public function __invoke(Request $request): JsonResponse
     {

@@ -11,9 +11,11 @@ use App\Services\Posts\ShareService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Create a share link for a post. Returns a public URL that can be shared without authentication.')]
 class CreateShareLinkTool extends WorkspaceTool
@@ -41,7 +43,11 @@ class CreateShareLinkTool extends WorkspaceTool
             ? CarbonImmutable::parse($validated['expires_at'])
             : null;
 
-        [$share, $token] = $shares->mint($post, $user, $expiresAt);
+        try {
+            [$share, $token] = $shares->mint($post, $user, $expiresAt);
+        } catch (ValidationException $exception) {
+            return Response::error($exception->errors()['approval'][0]);
+        }
 
         return Response::text(json_encode([
             'id' => $share->id,
@@ -53,6 +59,7 @@ class CreateShareLinkTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

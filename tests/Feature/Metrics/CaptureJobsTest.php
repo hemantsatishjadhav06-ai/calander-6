@@ -79,7 +79,7 @@ test('post job resolves and forwards the facebook page token to the graph api', 
     expect($target->refresh()->metrics_status)->toBe(MetricsStatus::Ok)
         ->and($target->likes)->toBe(4);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'access_token=page-token'));
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'access_token=page-token'));
 });
 
 test('post job resolves and forwards the discord webhook url to refetch reactions', function () {

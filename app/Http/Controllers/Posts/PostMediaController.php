@@ -31,7 +31,8 @@ class PostMediaController extends Controller
 
     public function updateAlt(Post $post, PostMedia $media, Request $request): JsonResponse
     {
-        abort_unless($media->workspace_id === $post->workspace_id, 404);
+        $media = PostMedia::query()->whereKey($media->id)->lockForUpdate()->firstOrFail();
+        abort_unless($media->workspace_id === $post->workspace_id && ($media->post_id === null || $media->post_id === $post->id), 404);
         abort_unless($post->status->isEditable(), 422, 'This post can no longer be edited.');
 
         $validated = $request->validate([
@@ -45,7 +46,8 @@ class PostMediaController extends Controller
 
     public function destroy(Post $post, PostMedia $media): JsonResponse
     {
-        abort_unless($media->workspace_id === $post->workspace_id, 404);
+        $media = PostMedia::query()->whereKey($media->id)->lockForUpdate()->firstOrFail();
+        abort_unless($media->workspace_id === $post->workspace_id && ($media->post_id === null || $media->post_id === $post->id), 404);
 
         $media->delete();
 

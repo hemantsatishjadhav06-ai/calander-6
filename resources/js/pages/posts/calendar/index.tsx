@@ -10,7 +10,8 @@ import {
 } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { Deferred, Head, router, useHttp, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { AgendaList } from '@/components/posts/calendar/agenda-list';
 import { CalendarHeader } from '@/components/posts/calendar/calendar-header';
@@ -67,6 +68,7 @@ export default function CalendarIndex({ yyyymm, view, posts }: Props) {
             : weekAnchor.format('MMM D, YYYY');
 
     const http = useHttp<Record<string, never>, Record<string, never>>({});
+    const reschedulingRef = useRef(false);
 
     // A small activation distance lets a plain click through to the chip's
     // open-post handler; only a >4px drag starts a reschedule.
@@ -201,6 +203,9 @@ export default function CalendarIndex({ yyyymm, view, posts }: Props) {
 
     function onDragEnd(e: DragEndEvent) {
         setDropHint(null);
+        if (reschedulingRef.current) {
+            return;
+        }
         const active = e.active.data.current as
             | { scheduledAt?: string | null }
             | undefined;
@@ -226,12 +231,21 @@ export default function CalendarIndex({ yyyymm, view, posts }: Props) {
             return;
         }
         const postId = String(e.active.id).replace(/^post-/, '');
+        reschedulingRef.current = true;
         http.transform(() => ({ scheduled_at: nextIso }));
         void http
             .put(schedule({ post: postId }).url, {
                 onNetworkError: () => undefined,
             })
-            .then(() => router.reload({ only: ['posts'] }));
+            .then(() => router.reload({ only: ['posts'] }))
+            .catch(() => {
+                toast.error(
+                    'Could not reschedule this post. Please try again.',
+                );
+            })
+            .finally(() => {
+                reschedulingRef.current = false;
+            });
     }
 
     return (

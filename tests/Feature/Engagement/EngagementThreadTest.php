@@ -265,7 +265,7 @@ test('mark read updates the base reply thread with a single bulk query', functio
 
     $updateQueries = [];
     DB::listen(function ($query) use (&$updateQueries): void {
-        if (str_starts_with(strtolower($query->sql), 'update "post_target_replies"')) {
+        if (str_starts_with(strtolower((string) $query->sql), 'update "post_target_replies"')) {
             $updateQueries[] = $query->sql;
         }
     });
@@ -295,7 +295,7 @@ test('archive updates the base reply thread with a single bulk query', function 
 
     $updateQueries = [];
     DB::listen(function ($query) use (&$updateQueries): void {
-        if (str_starts_with(strtolower($query->sql), 'update "post_target_replies"')) {
+        if (str_starts_with(strtolower((string) $query->sql), 'update "post_target_replies"')) {
             $updateQueries[] = $query->sql;
         }
     });
@@ -362,7 +362,6 @@ test('base reply lookup reuses the remote reply index for one collection', funct
     };
 
     $method = new ReflectionMethod(EngagementController::class, 'baseReplyFor');
-    $method->setAccessible(true);
 
     $controller = app(EngagementController::class);
 

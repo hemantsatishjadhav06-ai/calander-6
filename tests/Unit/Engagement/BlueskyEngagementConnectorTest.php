@@ -3,11 +3,15 @@
 use App\Models\ConnectedAccount;
 use App\Models\PostTarget;
 use App\Models\PostTargetReply;
-use App\Services\Atproto\DPoP;
 use App\Services\Engagement\Connectors\BlueskyEngagementConnector;
+use App\Support\PublicHttpUrl;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 function blueskyAccount(): ConnectedAccount
 {
@@ -43,7 +47,7 @@ test('fetchReplies flattens the thread and excludes the owner and root', functio
     $account = blueskyAccount();
     $target = PostTarget::factory()->create(['remote_id' => 'at://root', 'remote_ids' => ['at://root']]);
 
-    $result = (new BlueskyEngagementConnector(app(Factory::class), app(DPoP::class)))
+    $result = (app(BlueskyEngagementConnector::class))
         ->fetchReplies($account, $target, [], null);
 
     expect($result->isOk())->toBeTrue();
@@ -68,7 +72,7 @@ test('fetchReplies drops replies at or before since', function () {
         ]),
     ]);
 
-    $result = (new BlueskyEngagementConnector(app(Factory::class), app(DPoP::class)))
+    $result = (app(BlueskyEngagementConnector::class))
         ->fetchReplies(blueskyAccount(), PostTarget::factory()->create(['remote_id' => 'at://root']), [], CarbonImmutable::parse('2026-06-25T09:30:00Z'));
 
     expect($result->replies)->toHaveCount(0);
@@ -82,14 +86,14 @@ test('postReply creates a record threaded under the parent', function () {
 
     $parent = PostTargetReply::factory()->create(['remote_reply_id' => 'at://reply1', 'remote_cid' => 'cid1']);
 
-    $result = (new BlueskyEngagementConnector(app(Factory::class), app(DPoP::class)))
+    $result = (app(BlueskyEngagementConnector::class))
         ->postReply(blueskyAccount(), $parent, 'thanks!', ['session' => ['pds' => 'https://bsky.social', 'accessJwt' => 'jwt']]);
 
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('at://mine');
     expect($result->remoteCid)->toBe('cidmine');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'createRecord')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'createRecord')
         && $req['record']['reply']['parent']['uri'] === 'at://reply1'
         && $req['record']['reply']['root']['uri'] === 'at://root');
 });
@@ -102,12 +106,12 @@ test('postReply falls back to the parent as root when the parent is the original
 
     $parent = PostTargetReply::factory()->create(['remote_reply_id' => 'at://did:plc:author/app.bsky.feed.post/abc', 'remote_cid' => 'cid1']);
 
-    $result = (new BlueskyEngagementConnector(app(Factory::class), app(DPoP::class)))
+    $result = (app(BlueskyEngagementConnector::class))
         ->postReply(blueskyAccount(), $parent, 'thanks!', ['session' => ['pds' => 'https://bsky.social', 'accessJwt' => 'jwt']]);
 
     expect($result->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'createRecord')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'createRecord')
         && $req['record']['reply']['root']['uri'] === 'at://did:plc:author/app.bsky.feed.post/abc'
         && $req['record']['reply']['root']['cid'] === 'cid1');
 });

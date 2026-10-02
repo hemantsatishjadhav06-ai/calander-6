@@ -34,7 +34,13 @@ const getStoredAppearance = (): Appearance => {
         return 'system';
     }
 
-    return (localStorage.getItem('appearance') as Appearance) || 'system';
+    try {
+        const stored = localStorage.getItem('appearance');
+
+        return stored === 'light' || stored === 'dark' ? stored : 'system';
+    } catch {
+        return 'system';
+    }
 };
 
 const isDarkMode = (appearance: Appearance): boolean => {
@@ -75,12 +81,13 @@ export function initializeTheme(): void {
         return;
     }
 
-    if (!localStorage.getItem('appearance')) {
-        localStorage.setItem('appearance', 'system');
-        setCookie('appearance', 'system');
-    }
-
     currentAppearance = getStoredAppearance();
+    try {
+        localStorage.setItem('appearance', currentAppearance);
+    } catch {
+        // Theme selection still works when browser storage is unavailable.
+    }
+    setCookie('appearance', currentAppearance);
     applyTheme(currentAppearance);
 
     // Set up system theme change listener
@@ -102,7 +109,11 @@ export function useAppearance(): UseAppearanceReturn {
         currentAppearance = mode;
 
         // Store in localStorage for client-side persistence...
-        localStorage.setItem('appearance', mode);
+        try {
+            localStorage.setItem('appearance', mode);
+        } catch {
+            // Keep the current session usable when persistent storage is blocked.
+        }
 
         // Store in cookie for SSR...
         setCookie('appearance', mode);

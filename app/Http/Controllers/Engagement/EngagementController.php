@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use WeakMap;
 
 class EngagementController extends Controller
 {
@@ -272,7 +273,7 @@ class EngagementController extends Controller
     {
         static $indexCache = null;
 
-        $indexCache ??= new \WeakMap;
+        $indexCache ??= new WeakMap;
         if (! isset($indexCache[$targetReplies])) {
             $indexCache[$targetReplies] = $targetReplies->keyBy('remote_reply_id');
         }

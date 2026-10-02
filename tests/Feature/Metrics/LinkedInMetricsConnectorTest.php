@@ -45,8 +45,8 @@ test('fetchPost returns share statistics for a page account', function () {
         ->and($result->reposts)->toBe(5)
         ->and($result->impressions)->toBe(5287);
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'organizationalEntity=urn%3Ali%3Aorganization%3A2414183')
-        && str_contains($req->url(), 'shares=List'));
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'organizationalEntity=urn%3Ali%3Aorganization%3A2414183')
+        && str_contains((string) $req->url(), 'shares=List'));
 });
 
 test('fetchAccount returns follower count for a page account', function () {

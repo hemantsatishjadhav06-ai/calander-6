@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Posts;
 
 use App\Models\PostMedia;
+use App\Services\Media\DerivedMedia;
 use App\Support\FileStorage;
 use App\Support\SafeImageFetcher;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class MediaStorageService
 {
@@ -21,7 +23,7 @@ class MediaStorageService
     public function store(string $workspaceId, UploadedFile $file, ?string $altText = null): PostMedia
     {
         $disk = FileStorage::diskName();
-        $path = $file->store('media/'.$workspaceId, $disk);
+        $path = $this->storeUploadedImage($workspaceId, $file, $disk);
 
         $dimensions = @getimagesize($file->getRealPath()) ?: [null, null];
 
@@ -60,7 +62,9 @@ class MediaStorageService
 
         $disk = FileStorage::diskName();
         $path = 'media/'.$workspaceId.'/'.Str::uuid()->toString().'.'.$extension;
-        FileStorage::disk($disk)->put($path, $image['bytes']);
+        if (! FileStorage::disk($disk)->put($path, $image['bytes'])) {
+            throw new RuntimeException('Could not store the downloaded image.');
+        }
 
         $dimensions = @getimagesizefromstring($image['bytes']) ?: [null, null];
 
@@ -88,8 +92,15 @@ class MediaStorageService
     public function storeBeautified(string $workspaceId, UploadedFile $composed, UploadedFile $source, array $settings, ?string $altText = null): PostMedia
     {
         $disk = FileStorage::diskName();
-        $path = $composed->store('media/'.$workspaceId, $disk);
-        $sourcePath = $source->store('media/'.$workspaceId, $disk);
+        $path = $this->storeUploadedImage($workspaceId, $composed, $disk);
+
+        try {
+            $sourcePath = $this->storeUploadedImage($workspaceId, $source, $disk);
+        } catch (Throwable $e) {
+            FileStorage::disk($disk)->delete($path);
+
+            throw $e;
+        }
 
         $dimensions = @getimagesize($composed->getRealPath()) ?: [null, null];
 
@@ -121,7 +132,7 @@ class MediaStorageService
         // Store the new file and commit the row before deleting the old file, so a
         // failed store never leaves the row pointing at a now-missing path.
         $oldPath = $media->path;
-        $path = $composed->store('media/'.$media->workspace_id, $media->disk);
+        $path = $this->storeUploadedImage($media->workspace_id, $composed, $media->disk);
         $dimensions = @getimagesize($composed->getRealPath()) ?: [null, null];
 
         $media->update([
@@ -136,8 +147,20 @@ class MediaStorageService
 
         if ($oldPath !== $path) {
             FileStorage::disk($media->disk)->delete($oldPath);
+            FileStorage::disk($media->disk)->delete(DerivedMedia::pathsFor($media));
         }
 
         return $media->refresh();
+    }
+
+    private function storeUploadedImage(string $workspaceId, UploadedFile $file, string $disk): string
+    {
+        $path = $file->store('media/'.$workspaceId, $disk);
+
+        if ($path === false) {
+            throw new RuntimeException('Could not store the uploaded image.');
+        }
+
+        return $path;
     }
 }

@@ -9,6 +9,7 @@ use App\Models\Post;
 use App\Models\PostMedia;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Posts\PostSplitter;
 
 final class PostView
@@ -33,6 +34,7 @@ final class PostView
             'segments' => $post->segments,
             'mentions' => $post->mentions ?? [],
             'status' => $post->status->value,
+            'approval' => app(PostApprovalService::class)->toView($post, request()->user()),
             'scheduled_at' => $post->scheduled_at?->toIso8601String(),
             'auto_repost' => $post->auto_repost,
             'published_at' => $post->published_at?->toIso8601String(),

@@ -7,6 +7,8 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\Auth\SocialiteService;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
@@ -148,6 +150,38 @@ test('existing account is NOT linked when provider email is unverified', functio
 
     expect($call)->toThrow(SocialAuthException::class)
         ->and($existing->socialAccounts()->count())->toBe(0);
+});
+
+test('a concurrent email registration does not authenticate an unverified social email', function () {
+    $oauthUser = fakeSocialiteUser(['email' => 'race@example.com', 'email_verified' => false]);
+
+    DB::partialMock()->shouldReceive('transaction')->once()->andReturnUsing(function (): never {
+        User::factory()->create(['email' => 'race@example.com']);
+
+        throw new UniqueConstraintViolationException('sqlite', 'insert into users', [], new PDOException('Email already exists.'));
+    });
+
+    expect(fn () => app(SocialiteService::class)->loginOrRegister(SocialProvider::Google, $oauthUser, null))
+        ->toThrow(SocialAuthException::class);
+
+    $this->assertGuest();
+    expect(SocialAccount::query()->count())->toBe(0);
+});
+
+test('a concurrent email registration safely links a verified social email', function () {
+    $oauthUser = fakeSocialiteUser(['email' => 'race@example.com', 'email_verified' => true]);
+
+    DB::partialMock()->shouldReceive('transaction')->once()->andReturnUsing(function (): never {
+        User::factory()->create(['email' => 'race@example.com']);
+
+        throw new UniqueConstraintViolationException('sqlite', 'insert into users', [], new PDOException('Email already exists.'));
+    });
+
+    $result = app(SocialiteService::class)->loginOrRegister(SocialProvider::Google, $oauthUser, null);
+
+    $this->assertAuthenticatedAs($result->user);
+    expect($result->wasRegistered)->toBeFalse();
+    expect($result->user->socialAccounts()->where('provider_id', 'google-123')->exists())->toBeTrue();
 });
 
 test('authenticated user can link a new provider', function () {

@@ -23,9 +23,7 @@ test('post published notifies in-app only by default', function () {
 
     $user->notify(new PostPublishedNotification($target));
 
-    Notification::assertSentTo($user, PostPublishedNotification::class, function ($notification) use ($user) {
-        return $notification->via($user) === ['database'];
-    });
+    Notification::assertSentTo($user, PostPublishedNotification::class, fn ($notification) => $notification->via($user) === ['database']);
 });
 
 test('publish failed notifies on both channels by default', function () {
@@ -36,9 +34,7 @@ test('publish failed notifies on both channels by default', function () {
 
     $user->notify(new PublishFailedNotification($target));
 
-    Notification::assertSentTo($user, PublishFailedNotification::class, function ($notification) use ($user) {
-        return $notification->via($user) === ['database', 'mail'];
-    });
+    Notification::assertSentTo($user, PublishFailedNotification::class, fn ($notification) => $notification->via($user) === ['database', 'mail']);
 });
 
 test('post published respects disabled preferences', function () {
@@ -53,9 +49,7 @@ test('post published respects disabled preferences', function () {
 
     $user->notify(new PostPublishedNotification($target));
 
-    Notification::assertSentTo($user, PostPublishedNotification::class, function ($notification) use ($user) {
-        return $notification->via($user) === ['database'];
-    });
+    Notification::assertSentTo($user, PostPublishedNotification::class, fn ($notification) => $notification->via($user) === ['database']);
 });
 
 test('workspace invite to an existing user resolves to in-app and mail channels by default', function () {
@@ -75,7 +69,7 @@ test('workspace invite to an unregistered email resolves to the mail channel', f
     $invitation = WorkspaceInvitation::factory()->create();
     $anonymous = (new AnonymousNotifiable)->route('mail', 'newbie@example.com');
 
-    expect((new WorkspaceInviteNotification($invitation, 'plain-token'))->via($anonymous))->toBe(['mail']);
+    expect(new WorkspaceInviteNotification($invitation, 'plain-token')->via($anonymous))->toBe(['mail']);
 });
 
 test('account-needs-attention in-app channel cannot be silenced', function () {
@@ -89,9 +83,7 @@ test('account-needs-attention in-app channel cannot be silenced', function () {
 
     $user->notify(new AccountNeedsAttentionNotification($account, 'ws-123'));
 
-    Notification::assertSentTo($user, AccountNeedsAttentionNotification::class, function ($notification) use ($user) {
-        return $notification->via($user) === ['database'];
-    });
+    Notification::assertSentTo($user, AccountNeedsAttentionNotification::class, fn ($notification) => $notification->via($user) === ['database']);
 });
 
 test('new replies notification is internal only even when mail is enabled in preferences', function () {
@@ -103,5 +95,5 @@ test('new replies notification is internal only even when mail is enabled in pre
     $post = Post::factory()->for($user, 'author')->create();
     $target = PostTarget::factory()->for($post)->create();
 
-    expect((new NewRepliesNotification($target, 1))->via($user))->toBe(['database']);
+    expect(new NewRepliesNotification($target, 1)->via($user))->toBe(['database']);
 });

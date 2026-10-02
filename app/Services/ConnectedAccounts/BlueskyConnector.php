@@ -6,7 +6,10 @@ namespace App\Services\ConnectedAccounts;
 
 use App\Dto\ConnectedAccount\ConnectedAccountData;
 use App\Enums\Platform;
+use App\Support\PublicHttpUrl;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Http\Client\PendingRequest;
 use RuntimeException;
 use Throwable;
 
@@ -16,46 +19,59 @@ class BlueskyConnector
 
     private const string APPVIEW = 'https://public.api.bsky.app';
 
-    public function __construct(private readonly HttpFactory $http) {}
+    public function __construct(
+        private readonly HttpFactory $http,
+        private readonly PublicHttpUrl $urls,
+    ) {}
 
     public function connect(string $identifier, string $appPassword, ?string $pdsUrl = null): ConnectedAccountData
     {
         $identifier = $this->normalizeIdentifier($identifier);
-        $pds = $this->resolvePds($identifier, $pdsUrl);
+        $expectedDid = null;
+        $pds = $this->resolvePdsAndDid($identifier, $pdsUrl, $expectedDid);
 
         // Guard the resolved endpoint too (not just a user override) before sending
         // credentials to it — the DID-document endpoint is attacker-influenceable.
         $this->assertSafeServiceUrl($pds);
 
-        $sessionResponse = $this->http
-            ->timeout(10)
-            ->connectTimeout(5)
-            ->acceptJson()
-            ->post($pds.'/xrpc/com.atproto.server.createSession', [
-                'identifier' => $identifier,
-                'password' => $appPassword,
-            ]);
+        try {
+            $sessionResponse = $this->request($pds)
+                ->acceptJson()
+                ->post($pds.'/xrpc/com.atproto.server.createSession', [
+                    'identifier' => $identifier,
+                    'password' => $appPassword,
+                ]);
+        } catch (ConnectionException) {
+            throw new RuntimeException('Could not reach the Bluesky server. Please try again.');
+        }
 
-        if ($sessionResponse->failed()) {
+        if (! $sessionResponse->successful()) {
             throw new RuntimeException('Bluesky rejected those credentials. Check the identifier and app password.');
         }
 
         $session = $sessionResponse->json();
-        $did = (string) ($session['did'] ?? '');
+        $did = $session['did'] ?? null;
 
-        if ($did === '') {
+        if (! is_string($did) || $did === '') {
             throw new RuntimeException('Bluesky did not return an account identity.');
         }
 
-        $profileResponse = $this->http
-            ->timeout(10)
-            ->connectTimeout(5)
-            ->withToken((string) $session['accessJwt'])
-            ->acceptJson()
-            ->get($pds.'/xrpc/app.bsky.actor.getProfile', ['actor' => $did]);
+        if ($expectedDid !== null && $did !== $expectedDid) {
+            throw new RuntimeException('Bluesky returned a different account than the one requested.');
+        }
 
         /** @var array<string, mixed> $profile */
-        $profile = $profileResponse->successful() ? (array) $profileResponse->json() : [];
+        $profile = [];
+
+        try {
+            $profileResponse = $this->request($pds)
+                ->withToken((string) $session['accessJwt'])
+                ->acceptJson()
+                ->get($pds.'/xrpc/app.bsky.actor.getProfile', ['actor' => $did]);
+            $profile = $profileResponse->successful() ? (array) $profileResponse->json() : [];
+        } catch (ConnectionException) {
+            // Session creation succeeded; optional profile information can be fetched later.
+        }
 
         $handle = $profile['handle'] ?? $session['handle'] ?? $did;
 
@@ -104,56 +120,42 @@ class BlueskyConnector
             try {
                 $did = $this->resolveDid($identifier);
             } catch (Throwable) {
-                // DID resolution is best-effort when a PDS override is provided.
+                $did = null;
+            }
+
+            // bsky.social is the trusted sign-in broker for its hosted PDSs.
+            // A custom server must be authorized by the account's canonical DID.
+            if ($pds !== self::DEFAULT_PDS && ($did === null || $this->canonicalPdsForDid($did) !== $pds)) {
+                throw new RuntimeException('That Bluesky server does not match the account identity.');
             }
 
             return $pds;
         }
 
         try {
-            $did = $this->resolveHandleToDid($identifier);
-            $pds = $did ? $this->resolveDidToPds($did) : null;
+            $did = $this->resolveDid($identifier);
+            $pds = $did !== null ? $this->canonicalPdsForDid($did) : null;
 
             return $pds ?? self::DEFAULT_PDS;
         } catch (Throwable) {
+            $did = null;
+
             return self::DEFAULT_PDS;
         }
     }
 
     /**
-     * Reject PDS endpoints that could turn this server into an SSRF proxy: only
-     * https is allowed, and the host must not be localhost or a private/reserved
-     * IP literal. (IP-literal + obvious-host checks only — full DNS-rebinding
-     * defense is out of scope for M1.)
-     *
      * @throws RuntimeException when the endpoint is not a safe public https URL
      */
     public function assertSafeServiceUrl(string $url): void
     {
-        if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
-            throw new RuntimeException('The Bluesky service URL must use https.');
-        }
-
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (! is_string($host) || $host === '' || $this->isPrivateHost($host)) {
-            throw new RuntimeException('That Bluesky service URL is not allowed.');
-        }
+        $this->urls->options($url);
     }
 
-    private function isPrivateHost(string $host): bool
+    public function request(string $url): PendingRequest
     {
-        $host = strtolower(trim($host, '[]'));
-
-        if ($host === 'localhost' || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
-            return true;
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
-            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
-        }
-
-        return false;
+        return $this->http->withOptions($this->urls->options($url))
+            ->timeout(10)->connectTimeout(5);
     }
 
     private function resolveHandleToDid(string $handle): ?string
@@ -173,7 +175,7 @@ class BlueskyConnector
                 continue;
             }
 
-            $response = $this->http
+            $response = $this->request($service)
                 ->timeout(5)
                 ->connectTimeout(3)
                 ->acceptJson()
@@ -194,27 +196,68 @@ class BlueskyConnector
         return ltrim(trim($identifier), '@');
     }
 
-    private function resolveDidToPds(string $did): ?string
+    public function canonicalPdsForDid(string $did): string
     {
-        $response = $this->http
-            ->timeout(10)
-            ->connectTimeout(5)
-            ->acceptJson()
-            ->get('https://plc.directory/'.$did);
+        $documentUrl = $this->didDocumentUrl($did);
 
-        if ($response->failed()) {
-            return null;
+        try {
+            $response = $this->request($documentUrl)->acceptJson()->get($documentUrl);
+        } catch (ConnectionException) {
+            throw new RuntimeException('Could not verify the Bluesky account identity. Please try again.');
         }
 
-        /** @var array<int, array{type?: string, serviceEndpoint?: string}> $services */
+        if (! $response->successful() || $response->json('id') !== $did) {
+            throw new RuntimeException('Could not verify the Bluesky account identity.');
+        }
+
         $services = $response->json('service', []);
 
-        foreach ($services as $service) {
-            if (($service['type'] ?? null) === 'AtprotoPersonalDataServer' && isset($service['serviceEndpoint'])) {
-                return rtrim((string) $service['serviceEndpoint'], '/');
+        if (is_array($services)) {
+            foreach ($services as $service) {
+                if (! is_array($service)
+                    || ! in_array($service['id'] ?? null, ['#atproto_pds', $did.'#atproto_pds'], true)
+                    || ($service['type'] ?? null) !== 'AtprotoPersonalDataServer'
+                    || ! is_string($service['serviceEndpoint'] ?? null)) {
+                    continue;
+                }
+
+                $endpoint = rtrim($service['serviceEndpoint'], '/');
+                $this->assertSafeServiceUrl($endpoint);
+
+                return $endpoint;
             }
         }
 
-        return null;
+        throw new RuntimeException('The Bluesky account identity does not identify a server.');
+    }
+
+    private function didDocumentUrl(string $did): string
+    {
+        if (preg_match('/^did:plc:[a-z2-7]+$/D', $did) === 1) {
+            return 'https://plc.directory/'.$did;
+        }
+
+        if (str_starts_with($did, 'did:web:')) {
+            $parts = explode(':', substr($did, strlen('did:web:')));
+            $host = rawurldecode(array_shift($parts));
+
+            if ($host === '' || preg_match('/[\s\/?#@\\\\]/', $host) === 1) {
+                throw new RuntimeException('The Bluesky account identity is invalid.');
+            }
+
+            $path = '';
+            foreach ($parts as $part) {
+                $segment = rawurldecode($part);
+                if ($segment === '' || $segment === '.' || $segment === '..' || preg_match('/[\x00-\x20\/?#\\\\]/', $segment) === 1) {
+                    throw new RuntimeException('The Bluesky account identity is invalid.');
+                }
+
+                $path .= '/'.rawurlencode($segment);
+            }
+
+            return 'https://'.$host.($path === '' ? '/.well-known' : $path).'/did.json';
+        }
+
+        throw new RuntimeException('The Bluesky account identity is invalid.');
     }
 }

@@ -65,7 +65,7 @@ test('the platforms page describes how each network connects', function () {
 
 test('the developers page lists every tool the MCP server exposes', function () {
     /** @var list<class-string> $toolClasses */
-    $toolClasses = (new ReflectionClass(ShoutrrrServer::class))->getProperty('tools')->getDefaultValue();
+    $toolClasses = new ReflectionClass(ShoutrrrServer::class)->getProperty('tools')->getDefaultValue();
     $expectedNames = array_map(fn (string $class): string => app($class)->name(), $toolClasses);
 
     $this->get('/developers')->assertInertia(fn (Assert $page) => $page
@@ -81,7 +81,7 @@ test('the developers page shows the endpoints of the instance it is served from'
 });
 
 test('the home page counts the MCP tools it advertises', function () {
-    $toolCount = count((new ReflectionClass(ShoutrrrServer::class))->getProperty('tools')->getDefaultValue());
+    $toolCount = count(new ReflectionClass(ShoutrrrServer::class)->getProperty('tools')->getDefaultValue());
 
     $this->get('/')->assertInertia(fn (Assert $page) => $page->where('mcpToolCount', $toolCount));
 });

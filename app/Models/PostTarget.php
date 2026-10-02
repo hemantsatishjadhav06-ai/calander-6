@@ -9,6 +9,7 @@ use App\Enums\MetricsStatus;
 use App\Enums\Platform;
 use App\Enums\PostFormat;
 use App\Enums\PostTargetStatus;
+use App\Services\Posts\PostApprovalService;
 use Carbon\CarbonImmutable;
 use Database\Factories\PostTargetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -88,6 +89,18 @@ class PostTarget extends Model
 {
     /** @use HasFactory<PostTargetFactory> */
     use HasFactory, HasUuids;
+
+    #[Override]
+    protected static function booted(): void
+    {
+        static::updating(function (PostTarget $target): void {
+            if ($target->isDirty(['connected_account_id', 'platform', 'sections', 'segment_breaks', 'section_sources', 'content_override', 'auto_split', 'format'])) {
+                if (($post = $target->post()->withoutGlobalScopes()->first()) !== null) {
+                    app(PostApprovalService::class)->invalidate($post);
+                }
+            }
+        });
+    }
 
     /**
      * @return array<string, string>

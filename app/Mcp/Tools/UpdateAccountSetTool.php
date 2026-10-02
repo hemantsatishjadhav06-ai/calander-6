@@ -12,6 +12,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Update the name and/or member accounts of an account set in the bound workspace.')]
 class UpdateAccountSetTool extends WorkspaceTool
@@ -45,6 +46,7 @@ class UpdateAccountSetTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

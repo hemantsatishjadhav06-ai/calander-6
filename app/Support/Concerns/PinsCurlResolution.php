@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Concerns;
 
+use RuntimeException;
+
 /**
  * Shared by SafeImageFetcher and SafeVideoFetcher: builds the CURLOPT_RESOLVE
  * option that pins a connection to a pre-validated IP, closing the DNS-rebinding
@@ -22,6 +24,10 @@ trait PinsCurlResolution
      */
     protected function pinnedResolution(string $host, string $scheme, string $url, array $ips): array
     {
+        if (! extension_loaded('curl')) {
+            throw new RuntimeException('Safe media connections require the PHP cURL extension.');
+        }
+
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
             return [];
         }

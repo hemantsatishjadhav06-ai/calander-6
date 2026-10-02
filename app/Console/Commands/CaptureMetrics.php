@@ -13,15 +13,15 @@ use App\Models\ConnectedAccount;
 use App\Models\PostTarget;
 use App\Services\Metrics\MetricsCaptureCadence;
 use App\Support\InstanceSettings;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 
+#[Description('Fan out metric-capture jobs for due published targets and connected accounts.')]
+#[Signature('metrics:capture')]
 class CaptureMetrics extends Command
 {
-    protected $signature = 'metrics:capture';
-
-    protected $description = 'Fan out metric-capture jobs for due published targets and connected accounts.';
-
     public function handle(MetricsCaptureCadence $cadence, InstanceSettings $settings): int
     {
         if (! $settings->metricsEnabled()) {

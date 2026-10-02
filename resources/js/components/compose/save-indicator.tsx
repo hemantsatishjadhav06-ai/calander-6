@@ -21,10 +21,15 @@ export default function SaveIndicator({
 
     return (
         <div
+            role="status"
             className={cn(
-                'hidden shrink-0 items-center gap-1.5 pr-3 text-[11.5px] sm:flex',
+                'shrink-0 items-center gap-1.5 pr-3 text-[11.5px] sm:flex',
+                state === 'error' || state === 'offline' || state === 'conflict'
+                    ? 'flex'
+                    : 'hidden',
                 state === 'dirty' && 'text-amber-700 dark:text-amber-500',
                 state === 'conflict' && 'text-destructive',
+                state === 'error' && 'text-destructive',
                 state === 'offline' && 'text-amber-700 dark:text-amber-500',
             )}
         >
@@ -35,6 +40,7 @@ export default function SaveIndicator({
                     state === 'saving' && 'animate-pulse bg-blue-500',
                     state === 'dirty' && 'bg-amber-500',
                     state === 'conflict' && 'bg-destructive',
+                    state === 'error' && 'bg-destructive',
                     state === 'offline' && 'bg-amber-500',
                 )}
             />
@@ -57,7 +63,10 @@ export function formatSaveLabel(
         return 'Conflict';
     }
     if (state === 'offline') {
-        return 'Offline — saved locally';
+        return 'Offline — unsaved changes';
+    }
+    if (state === 'error') {
+        return 'Save failed — retry';
     }
     if (!lastSavedAt) {
         return 'Saved';

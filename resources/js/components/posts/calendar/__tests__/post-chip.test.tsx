@@ -1,13 +1,15 @@
 import { DndContext } from '@dnd-kit/core';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PostChip } from '@/components/posts/calendar/post-chip';
 import type { PostRowData } from '@/components/posts/post-row';
 import type { PlatformName } from '@/types/compose';
 
+const routerVisit = vi.hoisted(() => vi.fn());
+
 vi.mock('@inertiajs/react', () => ({
-    router: { visit: vi.fn() },
+    router: { visit: routerVisit },
     usePage: () => ({ props: {} }),
 }));
 
@@ -30,10 +32,10 @@ function basePost(overrides: Partial<PostRowData> = {}): PostRowData {
     };
 }
 
-function renderChip(post: PostRowData) {
+function renderChip(post: PostRowData, draggable = false) {
     return render(
         <DndContext>
-            <PostChip post={post} draggable={false} />
+            <PostChip post={post} draggable={draggable} />
         </DndContext>,
     );
 }
@@ -43,6 +45,32 @@ function stack(): HTMLElement {
 }
 
 describe('PostChip multi-account indicator', () => {
+    it('keeps approved protected schedules clickable for review while disabling direct drag changes', () => {
+        renderChip(
+            basePost({
+                approval: {
+                    required: true,
+                    status: 'approved',
+                } as PostRowData['approval'],
+            }),
+            true,
+        );
+        const chip = screen.getByTitle('Ship the multi-account indicator');
+        expect(chip).toHaveAttribute('aria-disabled', 'true');
+        expect(chip).toHaveClass('cursor-pointer');
+        fireEvent.click(chip);
+        expect(routerVisit).toHaveBeenCalledWith('/posts/post-1');
+    });
+
+    it('still permits direct drag changes when approval is not required', () => {
+        renderChip(basePost(), true);
+        expect(
+            screen.getByTitle('Ship the multi-account indicator'),
+        ).toHaveAttribute('aria-disabled', 'false');
+        expect(
+            screen.getByTitle('Ship the multi-account indicator'),
+        ).toHaveClass('cursor-grab');
+    });
     it('renders one glyph per platform with no remainder when every target is shown', () => {
         renderChip(
             basePost({

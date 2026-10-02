@@ -51,14 +51,14 @@ test('media attaches to the section the resolver assigned, not always the first'
         ->and($result->remoteIds)->toBe(['post-1', 'post-2']);
 
     // The first segment's container is a plain TEXT container (no media).
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['text'] === 'first (no media)'
         && $request['media_type'] === 'TEXT');
 
     // The second segment's container carries the image and chains to the first post.
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['text'] === 'second (has media)'
         && $request['media_type'] === 'IMAGE'
         && str_contains((string) $request['image_url'], 'pic.jpg')
@@ -114,8 +114,8 @@ test('a media-only first segment keeps its own container and does not leak media
 
     // Segment 0's container is a media-only IMAGE container with empty text and
     // no reply_to_id (it's the first post in the thread).
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['media_type'] === 'IMAGE'
         && str_contains((string) $request['image_url'], 'pic.jpg')
         && $request['text'] === ''
@@ -123,8 +123,8 @@ test('a media-only first segment keeps its own container and does not leak media
 
     // Segment 1's container is a plain TEXT container carrying its own text, no
     // leaked media, and chains to segment 0's published post.
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['media_type'] === 'TEXT'
         && $request['text'] === 'second (text only)'
         && $request['reply_to_id'] === 'post-1');

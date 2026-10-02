@@ -35,7 +35,7 @@ test('it transitions a published target to deleted', function () {
 
     $target = remoteDeleteTarget();
 
-    (new DeletePostTarget($target))->handle(
+    new DeletePostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
     );
@@ -50,7 +50,7 @@ test('it does not mark a target deleted when remote deletion fails', function ()
 
     $target = remoteDeleteTarget();
 
-    expect(fn () => (new DeletePostTarget($target))->handle(
+    expect(fn () => new DeletePostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
     ))->toThrow(RequestException::class);
@@ -65,7 +65,7 @@ test('it treats an already-missing remote target as deleted', function () {
 
     $target = remoteDeleteTarget();
 
-    (new DeletePostTarget($target))->handle(
+    new DeletePostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
     );
@@ -76,7 +76,7 @@ test('it treats an already-missing remote target as deleted', function () {
 test('it marks the target failed after queued delete retries are exhausted', function () {
     $target = remoteDeleteTarget();
 
-    (new DeletePostTarget($target))->failed(new Exception('remote delete failed'));
+    new DeletePostTarget($target)->failed(new Exception('remote delete failed'));
 
     expect($target->refresh()->status)->toBe(PostTargetStatus::Failed)
         ->and($target->error_message)->toBe('remote delete failed');

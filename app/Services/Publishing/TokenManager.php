@@ -14,7 +14,9 @@ use App\Models\ConnectedAccountSecret;
 use App\Services\Atproto\DPoP;
 use App\Services\ConnectedAccounts\Threads\ThreadsTokenExchanger;
 use App\Services\Usage\Concerns\TracksUsage;
+use App\Support\PublicHttpUrl;
 use App\Support\UsageOperation;
+use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
@@ -49,6 +51,7 @@ class TokenManager
         private readonly HttpFactory $http,
         private readonly DPoP $dpop,
         private readonly ThreadsTokenExchanger $threadsExchanger,
+        private readonly PublicHttpUrl $urls,
     ) {}
 
     /**
@@ -96,17 +99,33 @@ class TokenManager
             return ['access_token' => $secret->access_token];
         }
 
-        return Cache::lock("connected-account-token-refresh:{$account->id}", self::REFRESH_LOCK_SECONDS)
-            ->block(10, function () use ($account, $force): array {
-                $freshAccount = $account->newQueryWithoutScopes()->findOrFail($account->id);
-                $freshSecret = $freshAccount->secret()->firstOrFail();
+        return $this->withRefreshLock($account, function () use ($account, $force): array {
+            $freshAccount = $account->newQueryWithoutScopes()->findOrFail($account->id);
+            $freshSecret = $freshAccount->secret()->firstOrFail();
 
-                if (! $force && ! $this->needsRefresh($freshAccount)) {
-                    return ['access_token' => $freshSecret->access_token];
-                }
+            if (! $force && ! $this->needsRefresh($freshAccount)) {
+                return ['access_token' => $freshSecret->access_token];
+            }
 
-                return $this->refreshOAuth($freshAccount, $freshSecret);
-            });
+            return $this->refreshOAuth($freshAccount, $freshSecret);
+        });
+    }
+
+    /**
+     * @param  Closure(): array<string, mixed>  $refresh
+     * @return array<string, mixed>
+     */
+    private function withRefreshLock(ConnectedAccount $account, Closure $refresh): array
+    {
+        try {
+            return Cache::lock("connected-account-token-refresh:{$account->id}", self::REFRESH_LOCK_SECONDS)
+                ->block(10, $refresh);
+        } catch (LockTimeoutException $exception) {
+            throw new TransientTokenRefreshException(
+                "Token refresh is already in progress for account {$account->id}.",
+                previous: $exception,
+            );
+        }
     }
 
     private function needsRefresh(ConnectedAccount $account): bool
@@ -140,17 +159,16 @@ class TokenManager
         // one and 400s with invalid_grant, flipping the account to needs-attention.
         // Serialize per account and re-read the rotated state under the lock, exactly
         // as the generic OAuth path below does.
-        return Cache::lock("connected-account-token-refresh:{$account->id}", self::REFRESH_LOCK_SECONDS)
-            ->block(10, function () use ($account, $force): array {
-                $freshAccount = $account->newQueryWithoutScopes()->findOrFail($account->id);
-                $freshSecret = $freshAccount->secret()->firstOrFail();
+        return $this->withRefreshLock($account, function () use ($account, $force): array {
+            $freshAccount = $account->newQueryWithoutScopes()->findOrFail($account->id);
+            $freshSecret = $freshAccount->secret()->firstOrFail();
 
-                if (! $force && ! $this->needsRefresh($freshAccount)) {
-                    return $this->blueskyOAuthPayload($freshSecret);
-                }
+            if (! $force && ! $this->needsRefresh($freshAccount)) {
+                return $this->blueskyOAuthPayload($freshSecret);
+            }
 
-                return $this->refreshOAuth($freshAccount, $freshSecret);
-            });
+            return $this->refreshOAuth($freshAccount, $freshSecret);
+        });
     }
 
     /**
@@ -166,17 +184,16 @@ class TokenManager
             return ['access_token' => $secret->access_token];
         }
 
-        return Cache::lock("connected-account-token-refresh:{$account->id}", self::REFRESH_LOCK_SECONDS)
-            ->block(10, function () use ($account, $force): array {
-                $freshAccount = $account->newQueryWithoutScopes()->findOrFail($account->id);
-                $freshSecret = $freshAccount->secret()->firstOrFail();
+        return $this->withRefreshLock($account, function () use ($account, $force): array {
+            $freshAccount = $account->newQueryWithoutScopes()->findOrFail($account->id);
+            $freshSecret = $freshAccount->secret()->firstOrFail();
 
-                if (! $force && ! $this->needsRefresh($freshAccount)) {
-                    return ['access_token' => $freshSecret->access_token];
-                }
+            if (! $force && ! $this->needsRefresh($freshAccount)) {
+                return ['access_token' => $freshSecret->access_token];
+            }
 
-                return $this->refreshThreads($freshAccount, $freshSecret);
-            });
+            return $this->refreshThreads($freshAccount, $freshSecret);
+        });
     }
 
     /**
@@ -319,7 +336,7 @@ class TokenManager
         // Bound the request so a hung PDS cannot outlast the refresh lock's lease
         // (which would let a second worker refresh concurrently and race the
         // single-use refreshJwt); mirrors the timeouts used across the connectors.
-        $response = $this->http->timeout(10)->connectTimeout(5)->withToken($refreshJwt)->acceptJson()
+        $response = $this->http->withOptions($this->urls->options($pds))->timeout(10)->connectTimeout(5)->withToken($refreshJwt)->acceptJson()
             ->post($pds.'/xrpc/com.atproto.server.refreshSession');
 
         $this->meter(UsageCategory::ExternalApi, UsageOperation::TOKEN_REFRESH, $account, $response);
@@ -343,7 +360,7 @@ class TokenManager
             return null;
         }
 
-        $response = $this->http->timeout(10)->connectTimeout(5)->acceptJson()
+        $response = $this->http->withOptions($this->urls->options($pds))->timeout(10)->connectTimeout(5)->acceptJson()
             ->post($pds.'/xrpc/com.atproto.server.createSession', [
                 'identifier' => $identifier,
                 'password' => $appPassword,
@@ -401,6 +418,10 @@ class TokenManager
         // lock's lease and let a second worker race the single-use refresh token.
         $request = $this->http->asForm()->timeout(10)->connectTimeout(5);
 
+        if ($account->platform === Platform::Bluesky) {
+            $request->withOptions($this->urls->options($endpoint));
+        }
+
         $body = [
             'grant_type' => 'refresh_token',
             'refresh_token' => (string) $secret->refresh_token,
@@ -454,6 +475,7 @@ class TokenManager
                         $body['client_assertion'] = $this->dpop->clientAssertion($issuer, $this->dpop->signingKey(), $clientId);
                     }
                     $response = $this->http->asForm()->timeout(10)->connectTimeout(5)
+                        ->withOptions($this->urls->options($endpoint))
                         ->withHeader('DPoP', $this->dpop->proof('POST', $endpoint, $key, nonce: $nonce))
                         ->post((string) $endpoint, $body);
                 }

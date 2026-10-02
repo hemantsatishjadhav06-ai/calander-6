@@ -11,10 +11,12 @@ use App\Models\Workspace;
 use App\Support\UsageOperation;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Date;
+use Override;
 
 /** @extends Factory<UsageEvent> */
 class UsageEventFactory extends Factory
 {
+    #[Override]
     protected $model = UsageEvent::class;
 
     public function definition(): array

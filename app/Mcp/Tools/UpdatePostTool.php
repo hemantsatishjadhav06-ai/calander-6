@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Update a draft post: text, destination, per-account overrides, and attached media. Pass expected_updated_at (from get_post) for optimistic concurrency; a mismatch returns a stale-write error.')]
 class UpdatePostTool extends WorkspaceTool
@@ -72,6 +73,7 @@ class UpdatePostTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

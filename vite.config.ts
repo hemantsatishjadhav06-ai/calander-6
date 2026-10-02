@@ -9,7 +9,7 @@ import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 
-import { resolveAppVersion } from './resolve-app-version';
+import { resolveAppVersion } from './resolve-app-version.ts';
 
 // Copy the emojibase `en` locale into public/ so Frimousse and the emoji
 // typeahead fetch it same-origin. The app's CSP (connect-src 'self') blocks
@@ -128,6 +128,7 @@ export default defineConfig(({ mode }) => {
                 fonts: [
                     bunny('Instrument Sans', {
                         weights: [400, 500, 600],
+                        optimizedFallbacks: false,
                     }),
                     // Display face for the public product pages. Not preloaded:
                     // only pages that render a display heading fetch it, so the
@@ -136,6 +137,7 @@ export default defineConfig(({ mode }) => {
                         weights: [400, 500, 600],
                         styles: ['normal', 'italic'],
                         preload: false,
+                        optimizedFallbacks: false,
                     }),
                 ],
             }),

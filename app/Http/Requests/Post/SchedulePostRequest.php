@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Post;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Override;
 
 class SchedulePostRequest extends FormRequest
 {
@@ -28,6 +29,7 @@ class SchedulePostRequest extends FormRequest
     /**
      * @return array<string, string>
      */
+    #[Override]
     public function messages(): array
     {
         return [

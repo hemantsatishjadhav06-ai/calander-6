@@ -10,15 +10,15 @@ use App\Enums\PostTargetStatus;
 use App\Jobs\RepostPostTarget;
 use App\Models\PostTarget;
 use App\Services\Repost\RepostEligibility;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 
+#[Description('Fan out auto-repost jobs for due, well-performing published targets.')]
+#[Signature('posts:dispatch-due-reposts')]
 class DispatchDueReposts extends Command
 {
-    protected $signature = 'posts:dispatch-due-reposts';
-
-    protected $description = 'Fan out auto-repost jobs for due, well-performing published targets.';
-
     public function handle(RepostEligibility $eligibility): int
     {
         if (! config('repost.enabled')) {
@@ -43,7 +43,7 @@ class DispatchDueReposts extends Command
             // match the eligibility check's scope-free lookups.
             ->with([
                 'account' => fn ($query) => $query->withoutGlobalScopes(),
-                'post' => fn ($query) => $query->withoutGlobalScopes(),
+                'post' => fn ($query) => $query->withoutGlobalScopes()->with('workspace'),
             ])
             ->where('status', PostTargetStatus::Published->value)
             ->whereNotNull('remote_id')
@@ -55,6 +55,10 @@ class DispatchDueReposts extends Command
                 ->whereNull('disabled_at')
                 ->where('status', ConnectedAccountStatus::Active->value))
             ->each(function (PostTarget $target) use ($eligibility, $now): void {
+                if ($target->post?->workspace?->requires_post_approval) {
+                    return;
+                }
+
                 if ($eligibility->shouldRepost($target, $now)) {
                     RepostPostTarget::dispatch($target);
                 }

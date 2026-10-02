@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Services\Billing\WorkspaceSubscriptionGate;
 use App\Services\Posts\NextSlotResolver;
+use App\Services\Posts\PostApprovalService;
 use App\Support\PostView;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -18,9 +19,10 @@ class PostQueueController extends Controller
 {
     public function __construct(private readonly NextSlotResolver $resolver) {}
 
-    public function store(Request $request, Post $post, WorkspaceSubscriptionGate $subscriptions): JsonResponse
+    public function store(Request $request, Post $post, WorkspaceSubscriptionGate $subscriptions, PostApprovalService $approvals): JsonResponse
     {
         abort_unless($request->user()->can('update', $post), 403);
+        abort_unless($post->status->isAwaitingPublication(), 409, 'Only draft, scheduled, or missed posts can be queued.');
 
         $workspace = $post->workspace()->firstOrFail();
 
@@ -49,9 +51,12 @@ class PostQueueController extends Controller
             ], 422);
         }
 
-        $post->scheduled_at = $slot;
-        $post->status = PostStatus::Scheduled;
-        $post->save();
+        $approvals->assertPlan($post, $slot);
+
+        $claimed = Post::query()->whereKey($post->id)
+            ->where('status', $post->status->value)
+            ->update(['scheduled_at' => $slot, 'status' => PostStatus::Scheduled->value]);
+        abort_unless($claimed === 1, 409, 'This post has already changed. Refresh before scheduling.');
 
         return response()->json([
             'post' => PostView::make($post->fresh(['targets.account', 'media'])),

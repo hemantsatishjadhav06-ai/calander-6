@@ -177,6 +177,22 @@ export type PostView = {
     media: MediaView[];
     segment_breaks?: string[];
     placements?: Placement[];
+    approval?: PostApproval;
+};
+
+export type PostApproval = {
+    required: boolean;
+    status: 'draft' | 'awaiting_approval' | 'approved' | 'rejected';
+    revision: string;
+    reviewed_revision: string | null;
+    requested_at: string | null;
+    approved_at: string | null;
+    approved_by: string | null;
+    can_approve: boolean;
+    planned_schedule_at: string | null;
+    rejection_reason: string | null;
+    rejected_at: string | null;
+    rejected_by: string | null;
 };
 
 export type ComposePageProps = {

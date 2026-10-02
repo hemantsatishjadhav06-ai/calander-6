@@ -11,10 +11,12 @@ use App\Models\Workspace;
 use App\Support\UsageOperation;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Date;
+use Override;
 
 /** @extends Factory<UsagePeriodCounter> */
 class UsagePeriodCounterFactory extends Factory
 {
+    #[Override]
     protected $model = UsagePeriodCounter::class;
 
     public function definition(): array

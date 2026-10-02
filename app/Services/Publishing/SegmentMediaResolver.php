@@ -8,7 +8,7 @@ use App\Models\PostMedia;
 
 final class SegmentMediaResolver
 {
-    public const HEAD = '__head__';
+    public const string HEAD = '__head__';
 
     /**
      * @param  list<string>  $sections

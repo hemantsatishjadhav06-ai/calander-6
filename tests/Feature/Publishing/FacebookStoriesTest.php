@@ -71,11 +71,11 @@ test('a photo story uploads the photo unpublished then creates the story with no
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['story-1']);
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/photos')
-        && str_contains($r->url(), 'published=false'));
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/photos')
+        && str_contains((string) $r->url(), 'published=false'));
 
     Http::assertSent(function ($r) {
-        if (! str_contains($r->url(), '/photo_stories')) {
+        if (! str_contains((string) $r->url(), '/photo_stories')) {
             return false;
         }
 
@@ -113,15 +113,15 @@ test('a video story drives the video_stories start, upload, and finish phases', 
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['v-9']);
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/video_stories')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/video_stories')
         && ($r->data()['upload_phase'] ?? null) === 'start');
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), 'rupload.facebook.com')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), 'rupload.facebook.com')
         && $r->hasHeader('Authorization', 'OAuth page-tok')
         && $r->header('offset')[0] === '0'
         && $r->header('file_size')[0] === '30');
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/video_stories')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/video_stories')
         && ($r->data()['upload_phase'] ?? null) === 'finish'
         && ($r->data()['video_id'] ?? null) === 'v-9'
         && ! array_key_exists('description', $r->data()));
@@ -153,7 +153,7 @@ test('a video story start response missing the video id or upload url fails with
         ->and($result->errorKind)->toBe(ErrorKind::ServerError);
 
     // No upload attempted, and no bogus resumable state left for a retry to trip on.
-    Http::assertNotSent(fn ($r) => str_contains($r->url(), 'rupload.facebook.com'));
+    Http::assertNotSent(fn ($r) => str_contains((string) $r->url(), 'rupload.facebook.com'));
     expect($context->target->fresh()->media_upload_state)->toBeNull();
 });
 

@@ -7,11 +7,17 @@ use App\Models\ConnectedAccount;
 use App\Models\ConnectedAccountSecret;
 use App\Services\Atproto\DPoP;
 use App\Services\Publishing\TokenManager;
+use App\Support\PublicHttpUrl;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 it('refreshes bluesky oauth tokens with dpop and returns a bluesky session payload', function () {
     $key = app(DPoP::class)->generateKey();

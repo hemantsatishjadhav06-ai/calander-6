@@ -39,7 +39,7 @@ test('it persists a stable signing key and stores the value as valid json', func
     // Stored through the json-cast column, so the raw DB value must be valid JSON
     // (a raw encrypted blob would be rejected by Postgres/MySQL json columns).
     $raw = InstanceSetting::query()->find('oauth_signing_key')->getRawOriginal('value');
-    expect(json_decode($raw, flags: JSON_THROW_ON_ERROR))->toBeString();
+    expect(json_decode((string) $raw, flags: JSON_THROW_ON_ERROR))->toBeString();
 });
 
 test('it exposes the public jwks without the private component', function () {

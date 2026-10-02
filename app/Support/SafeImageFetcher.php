@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Support\Concerns\PinsCurlResolution;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use RuntimeException;
 
@@ -31,7 +32,10 @@ class SafeImageFetcher
 
     private const array ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-    public function __construct(private readonly HttpFactory $http) {}
+    public function __construct(
+        private readonly HttpFactory $http,
+        private readonly BoundedHttpDownload $download = new BoundedHttpDownload,
+    ) {}
 
     /**
      * Fetch an image from the given URL after SSRF validation.
@@ -55,30 +59,35 @@ class SafeImageFetcher
         $host = strtolower(trim($rawHost, '[]'));
         $ips = $this->resolveValidatedIps($host);
 
-        $response = $this->http
+        $request = $this->http
             ->timeout(10)
             ->connectTimeout(5)
             ->withOptions([
                 'allow_redirects' => false,
+                'proxy' => '',
                 'curl' => $this->pinnedResolution($host, (string) $scheme, $url, $ips),
-            ])
-            ->get($url);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Could not download the image (HTTP '.$response->status().').');
+            ]);
+        try {
+            $download = $this->download->download($request, $url, self::MAX_BYTES, 'Image exceeds the 8 MiB limit.');
+        } catch (ConnectionException) {
+            throw new RuntimeException('Could not connect to the image host.');
         }
 
-        $bytes = $response->body();
-        if (strlen($bytes) > self::MAX_BYTES) {
-            throw new RuntimeException('Image exceeds the 8 MiB limit.');
-        }
+        try {
+            $bytes = file_get_contents($download['path']);
+            if ($bytes === false) {
+                throw new RuntimeException('Could not read the downloaded image.');
+            }
 
-        $info = @getimagesizefromstring($bytes);
-        if ($info === false || ! in_array($info['mime'], self::ALLOWED_MIME, true)) {
-            throw new RuntimeException('URL did not return a supported image (jpeg, png, webp, gif).');
-        }
+            $info = @getimagesizefromstring($bytes);
+            if ($info === false || ! in_array($info['mime'], self::ALLOWED_MIME, true)) {
+                throw new RuntimeException('URL did not return a supported image (jpeg, png, webp, gif).');
+            }
 
-        return ['bytes' => $bytes, 'mime' => (string) $info['mime']];
+            return ['bytes' => $bytes, 'mime' => (string) $info['mime']];
+        } finally {
+            @unlink($download['path']);
+        }
     }
 
     /**
@@ -91,7 +100,8 @@ class SafeImageFetcher
      */
     private function resolveValidatedIps(string $host): array
     {
-        if ($host === 'localhost' || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+        $canonicalHost = rtrim($host, '.');
+        if ($canonicalHost === 'localhost' || str_ends_with($canonicalHost, '.localhost') || str_ends_with($canonicalHost, '.local') || str_ends_with($canonicalHost, '.internal')) {
             throw new RuntimeException('That host is not allowed.');
         }
 
@@ -106,7 +116,7 @@ class SafeImageFetcher
         }
 
         foreach ($ips as $ip) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE) === false) {
                 throw new RuntimeException('That host resolves to a private or reserved address.');
             }
         }

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'client_id',
     'workspace_id',
     'access_token_id',
+    'authorization_code_hash',
 ])]
 class McpGrantWorkspace extends Model
 {

@@ -47,7 +47,7 @@ class TestConnectedAccountsSeeder extends Seeder
                 ],
                 [
                     'display_name' => $data['display_name'],
-                    'avatar_url' => 'https://api.dicebear.com/9.x/initials/svg?seed='.urlencode($data['display_name']).'&backgroundType=gradientLinear',
+                    'avatar_url' => 'https://api.dicebear.com/9.x/initials/svg?seed='.urlencode((string) $data['display_name']).'&backgroundType=gradientLinear',
                     'remote_account_id' => $data['remote_account_id'],
                     'auth_method' => $data['auth_method'],
                     'connected_by_user_id' => $owner?->id,

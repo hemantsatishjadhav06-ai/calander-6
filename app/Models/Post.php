@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Concerns\HasWorkspaceScope;
 use App\Enums\PostStatus;
+use App\Services\Posts\PostApprovalService;
 use Carbon\CarbonImmutable;
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -32,6 +33,16 @@ use Override;
  * @property CarbonImmutable|null $published_at
  * @property CarbonImmutable|null $deleted_at
  * @property CarbonImmutable $updated_at
+ * @property CarbonImmutable|null $planned_schedule_at
+ * @property string|null $review_requested_revision
+ * @property CarbonImmutable|null $review_requested_at
+ * @property string|null $approved_revision
+ * @property string|null $approved_by
+ * @property CarbonImmutable|null $approved_at
+ * @property string|null $rejected_revision
+ * @property string|null $rejected_by
+ * @property CarbonImmutable|null $rejected_at
+ * @property string|null $rejection_reason
  */
 #[Fillable([
     'workspace_id',
@@ -52,9 +63,23 @@ class Post extends Model
     use HasFactory, HasUuids, HasWorkspaceScope;
 
     #[Override]
+    protected static function booted(): void
+    {
+        static::updating(function (Post $post): void {
+            if ($post->isDirty(['workspace_id', 'base_text', 'segments', 'mentions', 'auto_repost', 'planned_schedule_at'])) {
+                $post->forceFill(PostApprovalService::clearedReview());
+            }
+        });
+    }
+
+    #[Override]
     protected function casts(): array
     {
         return [
+            'planned_schedule_at' => 'immutable_datetime',
+            'review_requested_at' => 'immutable_datetime',
+            'approved_at' => 'immutable_datetime',
+            'rejected_at' => 'immutable_datetime',
             'status' => PostStatus::class,
             'auto_repost' => 'boolean',
             'mentions' => 'array',

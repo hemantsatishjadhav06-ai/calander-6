@@ -10,16 +10,20 @@ use App\Dto\Publishing\PublishResult;
 use App\Enums\ConnectedAccountStatus;
 use App\Enums\ErrorKind;
 use App\Enums\Platform;
+use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Exceptions\TokenRefreshException;
 use App\Exceptions\TransientTokenRefreshException;
+use App\Models\Post;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use App\Models\PostTargetAttempt;
+use App\Models\Workspace;
 use App\Notifications\AccountNeedsAttentionNotification;
 use App\Notifications\PostPublishedNotification;
 use App\Notifications\PublishFailedNotification;
 use App\Services\Billing\WorkspaceSubscriptionGate;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Publishing\BackoffSchedule;
 use App\Services\Publishing\PostStatusRollup;
 use App\Services\Publishing\PublishConnectorRegistry;
@@ -28,10 +32,12 @@ use App\Services\Publishing\TokenManager;
 use App\Support\InstanceSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class PublishPostTarget implements ShouldQueue
@@ -59,14 +65,27 @@ class PublishPostTarget implements ShouldQueue
      */
     public int $timeout = 900;
 
+    public bool $deleteWhenMissingModels = true;
+
     private const array TERMINAL = [
         PostTargetStatus::Published,
+        PostTargetStatus::Failed,
         PostTargetStatus::Skipped,
         PostTargetStatus::Deleting,
         PostTargetStatus::Deleted,
     ];
 
     public function __construct(public PostTarget $target) {}
+
+    /**
+     * @return list<WithoutOverlapping>
+     */
+    public function middleware(): array
+    {
+        return [new WithoutOverlapping($this->target->id)
+            ->dontRelease()
+            ->expireAfter($this->timeout + 60)];
+    }
 
     public function handle(
         PublishConnectorRegistry $registry,
@@ -78,12 +97,20 @@ class PublishPostTarget implements ShouldQueue
     ): void {
         $subscriptions ??= app(WorkspaceSubscriptionGate::class);
         $settings ??= app(InstanceSettings::class);
-        $target = $this->target->fresh() ?? $this->target;
+        $target = $this->target->fresh();
+        if ($target === null) {
+            return;
+        }
+
         $this->target = $target;
 
         // Guard against a stale delayed retry or a double dispatch firing after the
         // target already reached a terminal state: doing nothing keeps it a no-op.
         if (in_array($target->status, self::TERMINAL, true)) {
+            return;
+        }
+
+        if ($target->next_attempt_at?->isFuture()) {
             return;
         }
 
@@ -113,24 +140,61 @@ class PublishPostTarget implements ShouldQueue
             return;
         }
 
-        $attempt = DB::transaction(function () use ($target): PostTargetAttempt {
-            $target->forceFill([
+        $attempt = DB::transaction(function () use ($target): ?PostTargetAttempt {
+            $workspaceId = Post::withoutGlobalScopes()->whereKey($target->post_id)->value('workspace_id');
+            if ($workspaceId === null || Workspace::query()->whereKey($workspaceId)->lockForUpdate()->first() === null) {
+                return null;
+            }
+            $post = Post::withoutGlobalScopes()->whereKey($target->post_id)->lockForUpdate()->first();
+            if ($post === null) {
+                return null;
+            }
+
+            $current = PostTarget::query()->whereKey($target->id)->lockForUpdate()->first();
+
+            if ($current === null || in_array($current->status, self::TERMINAL, true)
+                || $current->next_attempt_at?->isFuture() || $this->isBeingDeleted($current)) {
+                return null;
+            }
+
+            try {
+                app(PostApprovalService::class)->assertPlan($post, $post->scheduled_at);
+            } catch (ValidationException $exception) {
+                $current->forceFill([
+                    'status' => PostTargetStatus::Failed->value,
+                    'error_kind' => ErrorKind::Validation->value,
+                    'error_message' => $exception->errors()['approval'][0],
+                    'next_attempt_at' => null,
+                ])->save();
+
+                return null;
+            }
+
+            $post->forceFill(['status' => PostStatus::Publishing->value])->save();
+            $this->target = $current;
+            $current->forceFill([
                 'status' => PostTargetStatus::Publishing->value,
-                'attempts' => $target->attempts + 1,
-                // Real duplicate-prevention relies on incremental remote_ids resume (spec §4.3)
-                // plus the terminal-status guard above; idempotency_key is reserved for providers
-                // that support an idempotency header (X/Bluesky/LinkedIn do not uniformly today).
-                'idempotency_key' => $target->idempotency_key ?? (string) Str::uuid(),
+                'attempts' => $current->attempts + 1,
+                'idempotency_key' => $current->idempotency_key ?? (string) Str::uuid(),
             ])->save();
 
             return PostTargetAttempt::create([
-                'post_target_id' => $target->id,
-                'attempt_no' => $target->attempts,
+                'post_target_id' => $current->id,
+                'attempt_no' => $current->attempts,
                 'status' => 'retrying',
                 'started_at' => Date::now(),
             ]);
         });
 
+        if ($attempt === null) {
+            if ($target->fresh()?->status === PostTargetStatus::Failed) {
+                $rollup->recompute($target->post()->firstOrFail());
+            }
+
+            return;
+        }
+
+        $target = $this->target;
         $account = $target->account()->firstOrFail();
 
         $workspace = $target->post()->firstOrFail()->workspace()->firstOrFail();
@@ -156,7 +220,10 @@ class PublishPostTarget implements ShouldQueue
             try {
                 $credentials = $tokens->fresh($account);
                 $connector = $registry->for($target->platform);
-                $result = $connector->publish($this->context($target, $credentials));
+                $context = $this->context($target, $credentials);
+                $post = $target->post()->firstOrFail();
+                app(PostApprovalService::class)->assertPlan($post, $post->scheduled_at);
+                $result = $connector->publish($context);
 
                 // The proactive token sweep can rotate a still-valid access token
                 // just after this job reads it. A resulting 401 means the request
@@ -166,8 +233,13 @@ class PublishPostTarget implements ShouldQueue
                 // account needs attention.
                 if ($result->errorKind === ErrorKind::AuthExpired) {
                     $credentials = $tokens->fresh($account, force: true);
-                    $result = $connector->publish($this->context($target, $credentials));
+                    $context = $this->context($target, $credentials);
+                    $post = $target->post()->firstOrFail();
+                    app(PostApprovalService::class)->assertPlan($post, $post->scheduled_at);
+                    $result = $connector->publish($context);
                 }
+            } catch (ValidationException $exception) {
+                $result = PublishResult::failure(ErrorKind::Validation, $exception->errors()['approval'][0]);
             } catch (TransientTokenRefreshException $e) {
                 // A transient token-endpoint failure (429/5xx/timeout) is not a bad
                 // credential — treat it as a retryable server error so the publish backs
@@ -178,13 +250,35 @@ class PublishPostTarget implements ShouldQueue
             }
         }
 
-        if ($result->isSuccessful()) {
-            $this->onSuccess($target, $attempt, $result);
-        } else {
-            $this->onFailure($target, $attempt, $result, $backoff);
+        $cleanup = DB::transaction(function () use ($target, $attempt, $result, $backoff): ?PostTarget {
+            $current = PostTarget::query()->whereKey($target->id)->lockForUpdate()->first();
+
+            if ($current === null) {
+                return null;
+            }
+
+            $this->target = $current;
+
+            if ($this->isBeingDeleted($current)) {
+                return $this->recordDeletedResult($current, $attempt, $result);
+            }
+
+            if ($result->isSuccessful()) {
+                $this->onSuccess($current, $attempt, $result);
+            } else {
+                $this->onFailure($current, $attempt, $result, $backoff);
+            }
+
+            return null;
+        });
+
+        if ($cleanup !== null) {
+            DeletePostTarget::dispatch($cleanup);
         }
 
-        $rollup->recompute($target->post()->firstOrFail());
+        if (($post = $this->target->post()->first()) !== null) {
+            $rollup->recompute($post);
+        }
     }
 
     /**
@@ -208,9 +302,39 @@ class PublishPostTarget implements ShouldQueue
      */
     public function failed(Throwable $e): void
     {
-        $target = $this->target->fresh() ?? $this->target;
+        $target = $this->target->fresh();
+
+        if ($target === null) {
+            return;
+        }
+
+        if ($this->isBeingDeleted($target)) {
+            $attempt = $target->attemptLogs()->whereNull('finished_at')->latest('id')->first();
+
+            if ($attempt !== null) {
+                $cleanup = DB::transaction(function () use ($target, $attempt, $e): ?PostTarget {
+                    $current = PostTarget::query()->whereKey($target->id)->lockForUpdate()->first();
+
+                    return $current === null ? null : $this->recordDeletedResult(
+                        $current,
+                        $attempt,
+                        PublishResult::failure(ErrorKind::Unknown, Str::limit($e->getMessage(), 1000)),
+                    );
+                });
+
+                if ($cleanup !== null) {
+                    DeletePostTarget::dispatch($cleanup);
+                }
+            }
+
+            return;
+        }
 
         if (in_array($target->status, self::TERMINAL, true)) {
+            return;
+        }
+
+        if ($target->next_attempt_at?->isFuture()) {
             return;
         }
 
@@ -243,6 +367,38 @@ class PublishPostTarget implements ShouldQueue
             $target->remote_ids ?? [],
             static fn (string $remoteId): bool => $remoteId !== '',
         ));
+    }
+
+    private function isBeingDeleted(PostTarget $target): bool
+    {
+        return in_array($target->status, [PostTargetStatus::Deleting, PostTargetStatus::Deleted], true)
+            || $target->post()->first()?->status === PostStatus::Deleted;
+    }
+
+    private function recordDeletedResult(PostTarget $target, PostTargetAttempt $attempt, PublishResult $result): ?PostTarget
+    {
+        $remoteIds = array_values(array_unique([
+            ...$this->postedRemoteIds($target),
+            ...$result->remoteIds,
+            ...($target->remote_id !== null ? [$target->remote_id] : []),
+        ]));
+
+        $target->forceFill([
+            'status' => $remoteIds === [] ? PostTargetStatus::Deleted->value : PostTargetStatus::Deleting->value,
+            'remote_id' => $remoteIds[0] ?? null,
+            'remote_ids' => $remoteIds,
+            'next_attempt_at' => null,
+        ])->save();
+
+        $attempt->forceFill([
+            'status' => $result->isSuccessful() ? 'published' : 'failed',
+            'error_kind' => $result->errorKind?->value,
+            'error_message' => $result->errorMessage,
+            'http_status' => $result->httpStatus,
+            'finished_at' => Date::now(),
+        ])->save();
+
+        return $remoteIds === [] ? null : $target;
     }
 
     /**

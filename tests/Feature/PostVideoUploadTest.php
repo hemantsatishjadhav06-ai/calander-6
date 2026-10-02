@@ -128,7 +128,7 @@ test('store endpoint moves the tmp object, creates a PostMedia row, and returns 
         ->and($media->duration_seconds)->toBe(30)
         ->and($media->width)->toBe(1920)
         ->and($media->height)->toBe(1080)
-        ->and(str_starts_with($media->path, 'media/'.$workspace->id.'/'))->toBeTrue();
+        ->and(str_starts_with((string) $media->path, 'media/'.$workspace->id.'/'))->toBeTrue();
 
     // Tmp object must be gone (moved to permanent path).
     expect(Storage::disk($disk)->exists($key))->toBeFalse();

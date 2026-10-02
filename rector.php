@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Rector\CodingStyle\Rector\ArrowFunction\ArrowFunctionDelegatingCallToFirstClassCallableRector;
 use Rector\Config\RectorConfig;
 use RectorLaravel\Set\LaravelSetProvider;
 
@@ -17,6 +18,11 @@ return RectorConfig::configure()
     ->withSkip([
         // Vendor-published Octane stub — leave its imports as shipped.
         __DIR__.'/config/octane.php',
+        // These closures deliberately bind $this to the controller via call().
+        // A first-class callable would resolve scopes() on the test instance.
+        ArrowFunctionDelegatingCallToFirstClassCallableRector::class => [
+            __DIR__.'/tests/Feature/ConnectedAccounts/MetaDirectMessageOptInTest.php',
+        ],
     ])
     ->withPhpSets()
     ->withSetProviders(LaravelSetProvider::class)

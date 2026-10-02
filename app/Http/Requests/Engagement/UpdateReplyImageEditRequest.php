@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Engagement;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Override;
 
 class UpdateReplyImageEditRequest extends FormRequest
 {
@@ -16,6 +17,7 @@ class UpdateReplyImageEditRequest extends FormRequest
     /**
      * Decode the JSON-encoded settings field (sent as a string in the multipart body).
      */
+    #[Override]
     protected function prepareForValidation(): void
     {
         if (is_string($this->settings)) {

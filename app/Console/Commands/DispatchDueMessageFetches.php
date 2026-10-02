@@ -11,14 +11,14 @@ use App\Models\ConnectedAccount;
 use App\Services\Messaging\MessageFetchCadence;
 use App\Support\InstanceSettings;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
+#[Description('Fan out DM-fetch jobs for consented connected accounts that are due.')]
+#[Signature('messages:dispatch-due')]
 class DispatchDueMessageFetches extends Command
 {
-    protected $signature = 'messages:dispatch-due';
-
-    protected $description = 'Fan out DM-fetch jobs for consented connected accounts that are due.';
-
     public function handle(InstanceSettings $settings, MessageFetchCadence $cadence): int
     {
         if (! $settings->messagesEnabled()) {

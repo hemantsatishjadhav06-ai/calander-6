@@ -273,7 +273,7 @@ class PublishPrecheck
             allMedia: array_values($media->all()),
         );
 
-        return array_map(static fn (array $sectionMedia): Collection => collect($sectionMedia), $bySection);
+        return array_map(collect(...), $bySection);
     }
 
     /**

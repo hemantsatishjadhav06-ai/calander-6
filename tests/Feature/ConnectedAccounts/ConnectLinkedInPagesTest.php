@@ -37,7 +37,7 @@ test('linkedin callback renders the page picker when organizations are administe
         ]),
     ]);
 
-    test()->get('/accounts/callback/linkedin?code=abc&state=xyz')
+    test()->get('/accounts/callback/linkedin?code=abc&state=test-oauth-state')
         // The `accounts/connect-linkedin` picker page is a later task; skip
         // Inertia's page-file existence check (mirrors ConnectMetaTest).
         ->assertInertia(fn ($page) => $page
@@ -54,7 +54,7 @@ test('linkedin callback stays single-step when the toggle is off', function () {
 
     fakeOAuthUser('linkedin-openid', ['id' => 'PERSON1', 'name' => 'Jane', 'nickname' => 'jane', 'approvedScopes' => []]);
 
-    test()->get('/accounts/callback/linkedin?code=abc&state=xyz')->assertRedirect(route('accounts.index'));
+    test()->get('/accounts/callback/linkedin?code=abc&state=test-oauth-state')->assertRedirect(route('accounts.index'));
 
     expect(ConnectedAccount::where('platform', 'linkedin')->count())->toBe(1);
 });
@@ -64,6 +64,7 @@ test('store persists the personal profile and selected pages', function () {
     app(InstanceSettings::class)->update(['linkedin_community_management_enabled' => true]);
 
     session(['accounts.linkedin.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('linkedin'),
         'person' => ['remoteAccountId' => 'PERSON1', 'handle' => 'jane', 'displayName' => 'Jane', 'avatarUrl' => null],
         'organizations' => ['2414183' => ['id' => '2414183', 'urn' => 'urn:li:organization:2414183', 'name' => 'Acme Inc', 'vanityName' => 'acme']],
         'accessToken' => 'tok',
@@ -91,6 +92,7 @@ test('store gates page engagement capability off when the org scope was not gran
     app(InstanceSettings::class)->update(['linkedin_community_management_enabled' => true]);
 
     session(['accounts.linkedin.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('linkedin'),
         'person' => ['remoteAccountId' => 'PERSON1', 'handle' => 'jane', 'displayName' => 'Jane', 'avatarUrl' => null],
         'organizations' => ['2414183' => ['id' => '2414183', 'urn' => 'urn:li:organization:2414183', 'name' => 'Acme Inc', 'vanityName' => 'acme']],
         'accessToken' => 'tok',
@@ -115,6 +117,7 @@ test('store rejects an organization selection missing an id and persists nothing
     app(InstanceSettings::class)->update(['linkedin_community_management_enabled' => true]);
 
     session(['accounts.linkedin.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('linkedin'),
         'person' => ['remoteAccountId' => 'PERSON1', 'handle' => 'jane', 'displayName' => 'Jane', 'avatarUrl' => null],
         'organizations' => ['2414183' => ['id' => '2414183', 'urn' => 'urn:li:organization:2414183', 'name' => 'Acme Inc', 'vanityName' => 'acme']],
         'accessToken' => 'tok',
@@ -135,6 +138,7 @@ test('store rejects an organization selection with an id outside the stashed whi
     app(InstanceSettings::class)->update(['linkedin_community_management_enabled' => true]);
 
     session(['accounts.linkedin.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('linkedin'),
         'person' => ['remoteAccountId' => 'PERSON1', 'handle' => 'jane', 'displayName' => 'Jane', 'avatarUrl' => null],
         'organizations' => ['2414183' => ['id' => '2414183', 'urn' => 'urn:li:organization:2414183', 'name' => 'Acme Inc', 'vanityName' => 'acme']],
         'accessToken' => 'tok',

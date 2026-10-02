@@ -19,10 +19,8 @@ Route::get('oauth/bluesky/client-metadata.json', BlueskyClientMetadataController
 Route::get('oauth/bluesky/jwks.json', [BlueskyClientMetadataController::class, 'jwks'])
     ->name('oauth.bluesky.jwks');
 
-// Route-model binding runs in SubstituteBindings, which executes before the
-// appended WorkspaceMiddleware sets the workspace Context — so the model's global
-// workspace scope is a no-op here. Scope the lookup to the authenticated user's
-// current workspace explicitly so a foreign id 404s (rather than leaking existence).
+// WorkspaceMiddleware validates membership before route-model binding. Keep
+// the lookup explicitly scoped so a foreign id 404s without leaking existence.
 Route::bind('account', fn (string $value): ConnectedAccount => ConnectedAccount::query()
     ->where('workspace_id', request()->user()?->current_workspace_id)
     ->whereKey($value)

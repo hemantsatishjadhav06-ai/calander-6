@@ -101,7 +101,7 @@ class LinkedInOrganizationDiscovery
      */
     private function resolveOrganizations(string $accessToken, array $urns): array
     {
-        $ids = array_map(fn (string $urn): string => $this->urnId($urn), $urns);
+        $ids = array_map($this->urnId(...), $urns);
 
         try {
             $response = $this->http
@@ -142,13 +142,7 @@ class LinkedInOrganizationDiscovery
 
     private function hasNextPage(mixed $links): bool
     {
-        foreach ((array) $links as $link) {
-            if (is_array($link) && ($link['rel'] ?? null) === 'next') {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any((array) $links, fn ($link) => is_array($link) && ($link['rel'] ?? null) === 'next');
     }
 
     private function urnId(string $urn): string

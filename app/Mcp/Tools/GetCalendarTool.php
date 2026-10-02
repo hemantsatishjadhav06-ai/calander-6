@@ -14,6 +14,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('List scheduled and published posts for a calendar month (YYYY-MM), padded to a 6-week grid.')]
 class GetCalendarTool extends WorkspaceTool
@@ -53,6 +54,7 @@ class GetCalendarTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

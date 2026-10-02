@@ -36,7 +36,7 @@ function runMessagesJobWith(ConnectedAccount $account, ConversationFetchResult $
     $registry = Mockery::mock(MessageConnectorRegistry::class);
     $registry->shouldReceive('for')->andReturn($connector);
 
-    (new FetchAccountMessages($account))->handle(
+    new FetchAccountMessages($account)->handle(
         $registry,
         app(TokenManager::class),
         app(MessagePersister::class),

@@ -38,7 +38,7 @@ test('resolves a vanity name to its urn and canonical localized name', function 
         ->and($result->name)->toBe('Coolify')
         ->and($result->gated)->toBeFalse();
 
-    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://api.linkedin.com/rest/organizations')
+    Http::assertSent(fn ($request) => str_starts_with((string) $request->url(), 'https://api.linkedin.com/rest/organizations')
         && $request['q'] === 'vanityName'
         && $request['vanityName'] === 'coolify');
 });

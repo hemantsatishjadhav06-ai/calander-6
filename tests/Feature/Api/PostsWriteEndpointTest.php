@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\PostStatus;
+use App\Enums\PostTargetStatus;
 use App\Jobs\DeletePostTarget;
 use App\Models\Post;
 use App\Models\PostTarget;
@@ -79,4 +80,33 @@ test('deleting a published post dispatches remote deletion for targets with a re
     $post->refresh();
     expect(Post::whereKey($post->id)->exists())->toBeTrue()
         ->and($post->status)->toBe(PostStatus::Deleted);
+});
+
+test('deleting an in-flight post retains its targets and cleans up a partial thread', function () {
+    Queue::fake();
+    [$user, $workspace, $token] = issuedKey();
+    $post = Post::factory()->for($workspace)->create([
+        'author_id' => $user->id,
+        'status' => PostStatus::Publishing,
+    ]);
+    $partial = PostTarget::factory()->for($post)->create([
+        'status' => PostTargetStatus::Publishing,
+        'remote_id' => null,
+        'remote_ids' => ['thread-segment-1'],
+    ]);
+    $pending = PostTarget::factory()->for($post)->create([
+        'status' => PostTargetStatus::Pending,
+        'next_attempt_at' => now()->addMinutes(5),
+    ]);
+
+    $this->withToken($token)->deleteJson("/api/v1/posts/{$post->id}")
+        ->assertOk()
+        ->assertJsonPath('remote', true);
+
+    expect($post->refresh()->status)->toBe(PostStatus::Deleted)
+        ->and($partial->refresh()->status)->toBe(PostTargetStatus::Deleting)
+        ->and($pending->refresh()->status)->toBe(PostTargetStatus::Deleted)
+        ->and($pending->next_attempt_at)->toBeNull();
+    Queue::assertPushed(DeletePostTarget::class, 1);
+    Queue::assertPushed(DeletePostTarget::class, fn (DeletePostTarget $job): bool => $job->target->is($partial));
 });

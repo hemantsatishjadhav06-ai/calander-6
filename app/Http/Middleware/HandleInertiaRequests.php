@@ -16,6 +16,7 @@ use App\Support\CommunityStats;
 use App\Support\FeedbackConfig;
 use App\Support\InstanceSettings;
 use App\Support\Notifications\NotificationPresenter;
+use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -108,14 +109,7 @@ class HandleInertiaRequests extends Middleware
      * they ask for: the unread-badge poll requests `shell.unreadReplies` and
      * `shell.unreadMessages` and never touches the account or set queries.
      *
-     * @return array{
-     *     accounts: \Closure(): array<int, array<string, mixed>>,
-     *     sets: \Closure(): array<int, array<string, mixed>>,
-     *     limits: \Closure(): list<array<string, mixed>>,
-     *     unreadReplies: \Closure(): int,
-     *     unreadMessages: \Closure(): int,
-     *     gifs_enabled: \Closure(): bool,
-     * }
+     * @return array{accounts: Closure():array<int, array<string, mixed>>, sets: Closure():array<int, array<string, mixed>>, limits: Closure():list<array<string, mixed>>, unreadReplies: Closure():int, unreadMessages: Closure():int, gifs_enabled: Closure():bool}
      */
     private function shellData(?User $user): array
     {
@@ -133,7 +127,7 @@ class HandleInertiaRequests extends Middleware
             'sets' => fn (): array => $workspaceId
                 ? $this->shellSets($workspaceId)
                 : [],
-            'limits' => fn (): array => Platform::allLimits(),
+            'limits' => Platform::allLimits(...),
             'unreadReplies' => fn (): int => $workspaceId
                 && $settings->engagementEnabled()
                 && $settings->engagementPollingEnabled()
@@ -237,6 +231,7 @@ class HandleInertiaRequests extends Middleware
                     'role' => $membership->role->value,
                     'logo' => $membership->workspace->logo,
                     'permissions' => $membership->permissions,
+                    'approval_required' => (bool) $membership->workspace->requires_post_approval,
                     'timezone' => $membership->workspace->postingSchedule->timezone ?? 'UTC',
                 ];
             }

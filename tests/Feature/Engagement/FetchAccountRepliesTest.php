@@ -17,7 +17,7 @@ use App\Support\InstanceSettings;
 
 function runAccountFetch(ConnectedAccount $account): void
 {
-    (new FetchAccountReplies($account))->handle(
+    new FetchAccountReplies($account)->handle(
         app(EngagementConnectorRegistry::class),
         app(TokenManager::class),
         app(ReplyPersister::class),

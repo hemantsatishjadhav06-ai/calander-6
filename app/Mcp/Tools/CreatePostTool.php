@@ -15,6 +15,7 @@ use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Create a new draft post in the bound workspace. Destination kind is all (every connected account), set (an account set id), or account (a single connected account id).')]
 class CreatePostTool extends WorkspaceTool
@@ -68,6 +69,7 @@ class CreatePostTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

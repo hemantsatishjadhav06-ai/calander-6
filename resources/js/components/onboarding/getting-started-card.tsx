@@ -41,6 +41,7 @@ const STEP_ICONS: Record<string, StepIconComponent> = {
 // renders expanded, the client reconciles on hydration).
 const COLLAPSE_KEY = 'onboarding-checklist-collapsed';
 const collapseListeners = new Set<() => void>();
+let currentCollapsed: boolean | null = null;
 
 function subscribeCollapsed(callback: () => void): () => void {
     collapseListeners.add(callback);
@@ -48,17 +49,29 @@ function subscribeCollapsed(callback: () => void): () => void {
 }
 
 function getCollapsedSnapshot(): boolean {
-    return (
-        typeof window !== 'undefined' &&
-        localStorage.getItem(COLLAPSE_KEY) === '1'
-    );
+    if (currentCollapsed !== null) {
+        return currentCollapsed;
+    }
+    try {
+        return (
+            typeof window !== 'undefined' &&
+            localStorage.getItem(COLLAPSE_KEY) === '1'
+        );
+    } catch {
+        return false;
+    }
 }
 
 function setCollapsed(value: boolean): void {
     if (typeof window === 'undefined') {
         return;
     }
-    localStorage.setItem(COLLAPSE_KEY, value ? '1' : '0');
+    currentCollapsed = value;
+    try {
+        localStorage.setItem(COLLAPSE_KEY, value ? '1' : '0');
+    } catch {
+        // Persist in memory for this session if browser storage is unavailable.
+    }
     collapseListeners.forEach((listener) => listener());
 }
 

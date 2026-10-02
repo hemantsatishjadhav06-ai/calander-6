@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Engagement;
 
 use App\Models\PostTarget;
-use App\Services\Metrics\MetricsCaptureCadence;
 use App\Support\InstanceSettings;
 use Carbon\CarbonImmutable;
 

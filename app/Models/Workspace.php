@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Exceptions\CannotDeleteInitialWorkspace;
+use App\Services\Posts\PostApprovalService;
 use App\Support\FileStorage;
 use Database\Factories\WorkspaceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Billable;
 use Laravel\Cashier\Subscription;
 use Override;
@@ -51,6 +53,13 @@ class Workspace extends Model
             $workspace->is_initial ??= ! static::query()->exists();
         });
 
+        static::updating(function (Workspace $workspace): void {
+            if ($workspace->isDirty(['owner_id', 'requires_post_approval'])) {
+                $workspace->assertApprovalAuthorityMutable();
+                $workspace->invalidateContentApprovals();
+            }
+        });
+
         static::deleting(function (Workspace $workspace): void {
             if ($workspace->is_initial && (bool) config('subscriptions.enabled')) {
                 throw new CannotDeleteInitialWorkspace;
@@ -58,6 +67,33 @@ class Workspace extends Model
 
             $workspace->cancelLiveSubscriptions();
         });
+    }
+
+    public function assertApprovalAuthorityMutable(): void
+    {
+        $current = static::query()->whereKey($this->id)->lockForUpdate()->first();
+        if ($current === null) {
+            return;
+        }
+
+        $blogPublishing = BlogDraft::withoutGlobalScopes()->where('workspace_id', $this->id)->where('publication_status', 'publishing')->exists();
+        if (! $current->requires_post_approval && ! $this->requires_post_approval && ! $blogPublishing) {
+            return;
+        }
+
+        abort_if(Post::withoutGlobalScopes()->where('workspace_id', $this->id)->where('status', 'publishing')->exists()
+            || PostTarget::query()->where('status', 'publishing')->whereHas('post', fn (EloquentBuilder $query): EloquentBuilder => $query->withoutGlobalScopes()->where('workspace_id', $this->id))->exists()
+            || $blogPublishing,
+            409, 'Wait for publishing to finish before changing the workspace owner or approval policy.');
+    }
+
+    public function invalidateContentApprovals(): void
+    {
+        Post::withoutGlobalScopes()->where('workspace_id', $this->id)->update(PostApprovalService::clearedReview());
+        BlogDraft::withoutGlobalScopes()->where('workspace_id', $this->id)->update([
+            ...PostApprovalService::clearedReview(),
+            'content_revision' => DB::raw('content_revision + 1'),
+        ]);
     }
 
     /**
@@ -176,6 +212,7 @@ class Workspace extends Model
     protected function casts(): array
     {
         return [
+            'requires_post_approval' => 'boolean',
             'is_initial' => 'boolean',
             'onboarding_welcomed_at' => 'datetime',
             'onboarding_dismissed_at' => 'datetime',

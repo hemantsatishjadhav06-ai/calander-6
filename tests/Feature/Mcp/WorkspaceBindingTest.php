@@ -40,7 +40,7 @@ test('consent capture records a pending binding for a member workspace', functio
     ]);
     $request->setUserResolver(fn () => $user);
 
-    (new CaptureMcpWorkspaceSelection)->handle($request, fn ($r) => response('ok'));
+    (new CaptureMcpWorkspaceSelection)->handle($request, fn ($r) => redirect('http://localhost/callback?code=approved-code'));
 
     expect(McpGrantWorkspace::where('user_id', $user->id)
         ->where('client_id', 'client-xyz')
@@ -72,7 +72,13 @@ test('issuing a token stamps the pending binding with the token id', function ()
         'client_id' => 'client-xyz',
         'workspace_id' => $workspace->id,
         'access_token_id' => null,
+        'authorization_code_hash' => hash('sha256', 'approved-code'),
     ]);
+
+    app()->instance('request', Request::create('/oauth/token', 'POST', [
+        'grant_type' => 'authorization_code',
+        'code' => 'approved-code',
+    ]));
 
     (new BindWorkspaceToAccessToken)->handle(
         new AccessTokenCreated('token-final', $user->id, 'client-xyz'),

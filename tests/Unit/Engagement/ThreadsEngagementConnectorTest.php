@@ -54,7 +54,7 @@ test('fetchReplies maps replies to FetchedReply', function () {
     expect($result->replies[0]->text)->toBe('nice thread');
     expect($result->replies[0]->remoteCreatedAt)->toBeInstanceOf(CarbonImmutable::class);
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/MEDIA1/replies')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/MEDIA1/replies')
         && str_contains((string) $req['fields'], 'username'));
 });
 
@@ -86,17 +86,17 @@ test('postReply creates a container with reply_to_id, polls, then publishes', fu
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('R2');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/THREADSUSER1/threads')
-        && ! str_contains($req->url(), 'threads_publish')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/THREADSUSER1/threads')
+        && ! str_contains((string) $req->url(), 'threads_publish')
         && $req['media_type'] === 'TEXT'
         && $req['text'] === 'thanks!'
         && $req['reply_to_id'] === 'R1'
         && $req['access_token'] === 't');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/CONTAINER1')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/CONTAINER1')
         && $req['fields'] === 'status');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/THREADSUSER1/threads_publish')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/THREADSUSER1/threads_publish')
         && $req['creation_id'] === 'CONTAINER1');
 });
 
@@ -136,7 +136,7 @@ test('postReply returns failed when the container never finishes processing', fu
 
     expect($result->status)->toBe(EngagementStatus::Failed);
 
-    Http::assertNotSent(fn ($req) => str_contains($req->url(), 'threads_publish'));
+    Http::assertNotSent(fn ($req) => str_contains((string) $req->url(), 'threads_publish'));
 });
 
 test('likeReply is unsupported and sends no HTTP request', function () {
@@ -183,5 +183,5 @@ test('deleteReply deletes the reply', function () {
 
     expect($result->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains($req->url(), '/R1'));
+    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains((string) $req->url(), '/R1'));
 });

@@ -94,7 +94,19 @@ class SocialiteService
             // this email) first. The transaction rolled back cleanly; recover by
             // logging into the now-existing account instead of erroring.
             $existing = $this->findLinkedAccount($provider, $oauthUser);
-            $recovered = $existing ? $existing->user : User::where('email', $email)->first();
+            $recovered = $existing?->user;
+
+            if ($recovered === null) {
+                if (! $this->providerEmailIsVerified($provider, $oauthUser)) {
+                    throw SocialAuthException::emailTaken($provider->label());
+                }
+
+                $recovered = User::where('email', $email)->first();
+
+                if ($recovered !== null) {
+                    $this->linkAccount($recovered, $provider, $oauthUser);
+                }
+            }
 
             if (! $recovered) {
                 throw SocialAuthException::couldNotComplete($provider->label());

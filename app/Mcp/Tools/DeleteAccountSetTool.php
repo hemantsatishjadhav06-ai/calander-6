@@ -11,6 +11,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Delete an account set from the bound workspace. Does not affect posts that used the set.')]
 class DeleteAccountSetTool extends WorkspaceTool
@@ -39,6 +40,7 @@ class DeleteAccountSetTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

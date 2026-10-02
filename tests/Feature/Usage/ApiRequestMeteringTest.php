@@ -28,7 +28,7 @@ function mcpGrantAttributes(Workspace $workspace, string $tokenId): array
  */
 function mcpUserWithToken(?string $tokenId): object
 {
-    return new class($tokenId)
+    return new readonly class($tokenId)
     {
         public function __construct(private ?string $tokenId) {}
 

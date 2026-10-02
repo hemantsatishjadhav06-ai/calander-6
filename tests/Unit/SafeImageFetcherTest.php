@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\SafeImageFetcher;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Http;
 
@@ -15,6 +16,14 @@ test('rejects private and loopback hosts', function (): void {
     expect(fn () => $fetcher->fetch('http://127.0.0.1/x.png'))->toThrow(RuntimeException::class);
     expect(fn () => $fetcher->fetch('http://169.254.169.254/latest/meta-data'))->toThrow(RuntimeException::class);
     expect(fn () => $fetcher->fetch('http://192.168.1.10/x.png'))->toThrow(RuntimeException::class);
+    expect(fn () => $fetcher->fetch('http://100.64.0.1/x.png'))->toThrow(RuntimeException::class);
+});
+
+test('reports image connection failures without leaking transport details', function (): void {
+    Http::fake(fn () => throw new ConnectionException('Sensitive transport details.'));
+
+    expect(fn () => app(SafeImageFetcher::class)->fetch('https://example.com/x.png'))
+        ->toThrow(RuntimeException::class, 'Could not connect to the image host.');
 });
 
 test('fetches a public image and returns its bytes and mime', function (): void {

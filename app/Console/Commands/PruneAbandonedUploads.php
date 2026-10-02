@@ -6,16 +6,17 @@ namespace App\Console\Commands;
 
 use App\Models\PostMedia;
 use App\Support\FileStorage;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
+#[Description('Delete abandoned presigned-upload tmp files under tmp/media/ older than 6 hours.')]
+#[Signature('media:prune-uploads')]
 class PruneAbandonedUploads extends Command
 {
-    protected $signature = 'media:prune-uploads';
-
-    protected $description = 'Delete abandoned presigned-upload tmp files under tmp/media/ older than 6 hours.';
-
     public function handle(): int
     {
         $disk = FileStorage::disk();
@@ -39,7 +40,7 @@ class PruneAbandonedUploads extends Command
                     $deleted++;
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('Skipping tmp/media prune after a storage error: '.$e->getMessage());
         }
 

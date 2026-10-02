@@ -64,7 +64,7 @@ test('bluesky oauth publish uses dpop authorization', function () {
     $result = app(BlueskyPublishConnector::class)->publish($context);
 
     expect($result->isSuccessful())->toBeTrue();
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'com.atproto.repo.createRecord')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), 'com.atproto.repo.createRecord')
         && $request->hasHeader('Authorization', 'DPoP oauth-token')
         && $request->hasHeader('DPoP'));
 });
@@ -80,7 +80,7 @@ test('bluesky resolves handles and sends mention facets', function () {
     expect($result->isSuccessful())->toBeTrue();
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 
@@ -101,7 +101,7 @@ test('bluesky sends link facets for bare domains', function () {
     expect($result->isSuccessful())->toBeTrue();
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 
@@ -122,7 +122,7 @@ test('bluesky excludes trailing punctuation from link facets', function () {
     expect($result->isSuccessful())->toBeTrue();
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 
@@ -156,11 +156,11 @@ test('bluesky uploads media blobs and embeds them on the post', function () {
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['at://r/1']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'com.atproto.repo.uploadBlob')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'com.atproto.repo.uploadBlob')
         && $request->body() === 'image-bytes');
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 
@@ -226,7 +226,7 @@ test('bluesky resume recovers cids and threads the resumed segment', function ()
         ]);
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 
@@ -289,7 +289,7 @@ test('bluesky compresses oversized images via the compressor before upload', fun
 
     app(BlueskyPublishConnector::class)->publish(bskyContext(['look'], [$media]));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'com.atproto.repo.uploadBlob')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'com.atproto.repo.uploadBlob')
         && $request->body() === 'small-bytes'
         && $request->hasHeader('Content-Type', 'image/webp'));
 });

@@ -8,6 +8,7 @@ use App\Dto\ConnectedAccount\ConnectedAccountData;
 use App\Enums\Platform;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
+use App\Services\ConnectedAccounts\AccountConnectionIntent;
 use App\Services\ConnectedAccounts\AccountConnectionService;
 use App\Services\ConnectedAccounts\LinkedIn\LinkedInOrganizationDiscovery;
 use App\Services\ConnectedAccounts\Threads\ThreadsTokenExchanger;
@@ -33,6 +34,7 @@ class OAuthConnectionController extends Controller
         private readonly ThreadsTokenExchanger $threadsExchanger,
         private readonly InstanceSettings $settings,
         private readonly LinkedInOrganizationDiscovery $linkedInOrganizations,
+        private readonly AccountConnectionIntent $intents,
     ) {}
 
     public function redirect(Request $request, string $platform): Response
@@ -41,7 +43,10 @@ class OAuthConnectionController extends Controller
 
         $request->user()->can('create', ConnectedAccount::class) ?: abort(403);
 
-        return $this->driver($resolved)->setScopes($this->scopesFor($resolved))->redirect();
+        $response = $this->driver($resolved)->setScopes($this->scopesFor($resolved))->redirect();
+        $this->intents->rememberRedirect($request, $resolved->value, $response);
+
+        return $response;
     }
 
     public function callback(Request $request, string $platform): RedirectResponse|InertiaResponse
@@ -49,6 +54,10 @@ class OAuthConnectionController extends Controller
         $resolved = $this->resolveOAuthPlatform($platform);
 
         $request->user()->can('create', ConnectedAccount::class) ?: abort(403);
+
+        if (! $this->intents->callbackMatches($request, $resolved->value)) {
+            return $this->failed('This account connection expired or belongs to another workspace. Start again from the intended workspace.');
+        }
 
         // The provider can bounce back with an error instead of a code — most
         // commonly when the user presses "Cancel" on the consent screen.
@@ -188,6 +197,7 @@ class OAuthConnectionController extends Controller
         ];
 
         $request->session()->put('accounts.linkedin.connect', [
+            'connection_intent' => $this->intents->current($request, Platform::LinkedIn->value),
             'person' => $person,
             'organizations' => $stashedOrganizations,
             'accessToken' => $data->accessToken,

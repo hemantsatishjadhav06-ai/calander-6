@@ -54,7 +54,7 @@ test('fetchReplies maps comments to FetchedReply', function () {
     expect($result->replies[0]->text)->toBe('nice post');
     expect($result->replies[0]->remoteCreatedAt)->toBeInstanceOf(CarbonImmutable::class);
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/POST1/comments')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/POST1/comments')
         && $req['filter'] === 'toplevel'
         && $req['order'] === 'chronological');
 });
@@ -94,7 +94,7 @@ test('postReply posts a comment and returns the id', function () {
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('C2');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/C1/comments')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/C1/comments')
         && $req['message'] === 'thanks!'
         && $req['access_token'] === 't');
 });
@@ -131,7 +131,7 @@ test('likeReply likes a comment', function () {
 
     expect($result->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => $req->method() === 'POST' && str_contains($req->url(), '/C1/likes'));
+    Http::assertSent(fn ($req) => $req->method() === 'POST' && str_contains((string) $req->url(), '/C1/likes'));
 });
 
 test('unlikeReply removes the like', function () {
@@ -146,7 +146,7 @@ test('unlikeReply removes the like', function () {
 
     expect($result->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains($req->url(), '/C1/likes'));
+    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains((string) $req->url(), '/C1/likes'));
 });
 
 test('deleteReply deletes the comment', function () {
@@ -161,5 +161,5 @@ test('deleteReply deletes the comment', function () {
 
     expect($result->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains($req->url(), '/C1'));
+    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains((string) $req->url(), '/C1'));
 });

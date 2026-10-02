@@ -31,6 +31,7 @@ use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Mcp\Server\Tool;
+use Override;
 
 #[Name('SM Manager')]
 #[Version('1.0.0')]
@@ -40,6 +41,7 @@ class ShoutrrrServer extends Server
     /**
      * @var array<int, class-string<Tool>>
      */
+    #[Override]
     protected array $tools = [
         GetPostTool::class,
         ListWorkspacesTool::class,

@@ -19,6 +19,47 @@ function post(partial: Partial<PostView>): PostView {
 }
 
 describe('postCapabilities', () => {
+    it('uses the composer review workflow instead of inline schedule changes in protected workspaces', () => {
+        const approval = {
+            required: true,
+            status: 'awaiting_approval',
+            revision: 'new',
+            reviewed_revision: null,
+        } as PostView['approval'];
+        expect(
+            postCapabilities(post({ status: 'draft', approval })).canSchedule,
+        ).toBe(false);
+        const scheduled = postCapabilities(
+            post({ status: 'scheduled', approval }),
+        );
+        expect(scheduled.canReschedule).toBe(false);
+        expect(scheduled.canUnschedule).toBe(true);
+        expect(
+            postCapabilities(post({ status: 'missed', approval }))
+                .canReschedule,
+        ).toBe(false);
+    });
+
+    it('offers retries only while the required approval matches the current revision', () => {
+        const approval = {
+            required: true,
+            status: 'approved',
+            revision: 'review-1',
+            reviewed_revision: 'review-1',
+        } as PostView['approval'];
+        const failed = post({
+            status: 'failed',
+            approval,
+            targets: [{ status: 'failed' } as PostView['targets'][number]],
+        });
+        expect(postCapabilities(failed).canRetry).toBe(true);
+        expect(
+            postCapabilities({
+                ...failed,
+                approval: { ...approval!, revision: 'edited' },
+            }).canRetry,
+        ).toBe(false);
+    });
     it('draft: edit/schedule/delete, no duplicate', () => {
         const c = postCapabilities(post({ status: 'draft' }));
         expect(c).toMatchObject({

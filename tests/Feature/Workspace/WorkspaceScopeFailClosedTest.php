@@ -63,6 +63,61 @@ test('the middleware repairs a null current workspace from an existing membershi
     expect(Context::get('workspace_id'))->toBe($workspace->id);
 });
 
+test('a revoked current workspace cannot be read through dashboard or search', function (): void {
+    $workspace = Workspace::factory()->create();
+    $user = User::factory()->create(['current_workspace_id' => $workspace->id]);
+    $membership = WorkspaceMembership::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $user->id,
+    ]);
+    Post::factory()->create([
+        'workspace_id' => $workspace->id,
+        'base_text' => 'revoked-workspace-private-content',
+    ]);
+    $membership->delete();
+
+    $this->actingAs($user)->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee('revoked-workspace-private-content');
+    $this->getJson(route('command-search', ['q' => 'revoked-workspace']))
+        ->assertOk()
+        ->assertJsonPath('posts', []);
+
+    expect($user->fresh()->current_workspace_id)->toBeNull();
+    expect(Context::get('workspace_id'))->toBe(WorkspaceMiddleware::NO_WORKSPACE);
+});
+
+test('a stale current workspace is repaired before binding a revoked workspace post', function (): void {
+    $revokedWorkspace = Workspace::factory()->create();
+    $remainingWorkspace = Workspace::factory()->create();
+    $user = User::factory()->create(['current_workspace_id' => $revokedWorkspace->id]);
+    WorkspaceMembership::factory()->create([
+        'workspace_id' => $remainingWorkspace->id,
+        'user_id' => $user->id,
+    ]);
+    $post = Post::factory()->create([
+        'workspace_id' => $revokedWorkspace->id,
+        'base_text' => 'revoked-workspace-private-content',
+    ]);
+
+    $this->actingAs($user)->get(route('posts.show', $post))->assertNotFound();
+
+    expect($user->fresh()->current_workspace_id)->toBe($remainingWorkspace->id);
+});
+
+test('repairing a current workspace permits binding a post in the remaining workspace', function (): void {
+    $revokedWorkspace = Workspace::factory()->create();
+    $remainingWorkspace = Workspace::factory()->create();
+    $user = User::factory()->create(['current_workspace_id' => $revokedWorkspace->id]);
+    WorkspaceMembership::factory()->create([
+        'workspace_id' => $remainingWorkspace->id,
+        'user_id' => $user->id,
+    ]);
+    $post = Post::factory()->create(['workspace_id' => $remainingWorkspace->id]);
+
+    $this->actingAs($user)->get(route('posts.show', $post))->assertOk();
+});
+
 /**
  * Regression guard. The scheduler claims due posts for every tenant and
  * PublishPostTarget resolves the scoped `post`/`account` relations, all with no

@@ -67,7 +67,7 @@ it('sends a report to discord with server-derived context', function () {
 
         return $embed['description'] === 'It broke'
             && collect($embed['fields'])->contains(fn ($f) => $f['value'] === 'ada@test.co')
-            && collect($embed['fields'])->contains(fn ($f) => str_contains($f['value'], 'Acme'));
+            && collect($embed['fields'])->contains(fn ($f) => str_contains((string) $f['value'], 'Acme'));
     });
 });
 
@@ -156,8 +156,8 @@ it('forwards an attached diagnostics file to discord', function () {
         ])
         ->assertOk();
 
-    Http::assertSent(fn ($request) => str_contains($request->body(), 'diagnostics.json')
-        && str_contains($request->body(), 'boom'));
+    Http::assertSent(fn ($request) => str_contains((string) $request->body(), 'diagnostics.json')
+        && str_contains((string) $request->body(), 'boom'));
 });
 
 it('redacts the operator origin from diagnostics on self-hosted instances', function () {
@@ -256,7 +256,7 @@ it('keeps diagnostics urls intact on cloud instances', function () {
         ])
         ->assertOk();
 
-    Http::assertSent(fn ($request) => str_contains($request->body(), 'app.shoutrrr.com'));
+    Http::assertSent(fn ($request) => str_contains((string) $request->body(), 'app.shoutrrr.com'));
 });
 
 it('attaches an uploaded screenshot as multipart', function () {
@@ -273,7 +273,7 @@ it('attaches an uploaded screenshot as multipart', function () {
         ])
         ->assertOk();
 
-    Http::assertSent(fn ($request) => str_contains($request->body(), 'name="files[0]"'));
+    Http::assertSent(fn ($request) => str_contains((string) $request->body(), 'name="files[0]"'));
 });
 
 it('validates the request', function () {
@@ -325,5 +325,5 @@ it('sends with unknown workspace when the user has no current workspace', functi
         ->assertOk();
 
     Http::assertSent(fn ($request) => collect($request['embeds'][0]['fields'])
-        ->contains(fn ($f) => str_contains($f['value'], 'unknown')));
+        ->contains(fn ($f) => str_contains((string) $f['value'], 'unknown')));
 });

@@ -57,6 +57,10 @@ const PLATFORM_OPTIONS: { value: string; label: string }[] = [
     { value: 'x', label: 'X' },
     { value: 'bluesky', label: 'Bluesky' },
     { value: 'linkedin', label: 'LinkedIn' },
+    { value: 'facebook', label: 'Facebook' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'threads', label: 'Threads' },
+    { value: 'discord', label: 'Discord' },
 ];
 
 function FilterChip({
@@ -87,12 +91,30 @@ export default function PostsIndex({ posts, filters, sets, counts }: Props) {
     const hasMore = !!scrollProps?.nextPage;
 
     const [localQ, setLocalQ] = useState(filters.q);
+    const [lastServerQ, setLastServerQ] = useState(filters.q);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Keep localQ in sync when server filters change (e.g. back/forward nav)
-    useEffect(() => {
+    if (lastServerQ !== filters.q) {
+        setLastServerQ(filters.q);
         setLocalQ(filters.q);
+    }
+
+    useEffect(() => {
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+        }
     }, [filters.q]);
+
+    useEffect(
+        () => () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        },
+        [],
+    );
 
     function applyFilters(next: {
         status?: string;
@@ -108,9 +130,9 @@ export default function PostsIndex({ posts, filters, sets, counts }: Props) {
                 status: next.status ?? filters.status,
                 set: next.set ?? filters.set,
                 platform: next.platform ?? filters.platform,
-                q: next.q ?? filters.q,
+                q: next.q ?? localQ,
             },
-            only: ['posts', 'filters'],
+            only: ['posts', 'filters', 'counts'],
             reset: ['posts'],
             replace: true,
             preserveScroll: false,

@@ -5,8 +5,9 @@
 # ============================================================
 # https://hub.docker.com/r/serversideup/php/tags?name=frankenphp
 ARG SERVERSIDEUP_PHP_VERSION=8.5-frankenphp-trixie
+ARG BUN_VERSION=1.4.2
 # https://www.postgresql.org/support/versioning/
-ARG POSTGRES_VERSION=17
+ARG POSTGRES_VERSION=18
 ARG USER_ID=9999
 ARG GROUP_ID=9999
 # The running app version, set by the release pipeline from the published git
@@ -75,7 +76,7 @@ USER www-data
 # SSR bundle are arch-independent, and this avoids running Bun/Vite under QEMU
 # emulation. node_modules native deps here (oxide/lightningcss/rolldown) are
 # build-time only; the SSR runtime bundle loads pure-JS deps.
-FROM --platform=$BUILDPLATFORM oven/bun:latest AS assets
+FROM --platform=$BUILDPLATFORM oven/bun:${BUN_VERSION} AS assets
 
 WORKDIR /app
 COPY package.json bun.lock vite.config.ts ./
@@ -97,6 +98,11 @@ ARG APP_VERSION
 ENV APP_VERSION=${APP_VERSION}
 # Builds client assets AND the SSR bundle (bootstrap/ssr/ssr.mjs)
 RUN bun run build:ssr
+
+# ============================================================
+# Stage: bun-runtime — Bun for the target architecture
+# ============================================================
+FROM oven/bun:${BUN_VERSION} AS bun-runtime
 
 # ============================================================
 # Stage: app — production image (single container, supervised)
@@ -128,6 +134,14 @@ RUN docker-php-serversideup-set-id www-data ${USER_ID}:${GROUP_ID} \
 RUN install-php-extensions redis gd exif bcmath
 
 # System packages + Bun (needed when SSR is toggled on: inertia:start-ssr --runtime=bun)
+# PostgreSQL's signed repository provides a client matching PostgreSQL 18 on
+# Debian trixie; an older pg_dump cannot back up a newer production database.
+RUN install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsS https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && . /etc/os-release \
+    && printf 'Types: deb\nURIs: https://apt.postgresql.org/pub/repos/apt\nSuites: %s-pgdg\nComponents: main\nSigned-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc\n' \
+        "$VERSION_CODENAME" > /etc/apt/sources.list.d/pgdg.sources
 RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-client-${POSTGRES_VERSION} \
         git \
@@ -137,20 +151,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         supervisor \
     && rm -rf /var/lib/apt/lists/*
-# Install the Bun binary for the target architecture (amd64 -> x64, arm64 -> aarch64).
-# TARGETARCH is provided automatically by buildx.
-ARG TARGETARCH
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-        amd64) bun_arch=x64 ;; \
-        arm64) bun_arch=aarch64 ;; \
-        *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSL "https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${bun_arch}.zip" -o /tmp/bun.zip; \
-    unzip /tmp/bun.zip -d /tmp; \
-    mv "/tmp/bun-linux-${bun_arch}/bun" /usr/local/bin/bun; \
-    chmod 755 /usr/local/bin/bun; \
-    rm -rf /tmp/bun.zip "/tmp/bun-linux-${bun_arch}"
+# Use the same pinned Bun release at build time and runtime. The image stage
+# supplies the target architecture without fetching an unpinned release zip.
+COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
 
 # serversideup runtime configuration knobs
 ARG AUTORUN_ENABLED=true
@@ -196,13 +199,17 @@ ENV PHP_OPCACHE_ENABLE=${PHP_OPCACHE_ENABLE} \
     QUEUE_WORKER_COUNT=${QUEUE_WORKER_COUNT}
 
 # Supervisor supervises the web/worker/scheduler/ssr processes
-COPY docker/supervisord.conf /etc/supervisor/laravel.conf
+COPY --chmod=644 docker/supervisord.conf /etc/supervisor/laravel.conf
 # Queue worker launcher (kept out of supervisord.conf's inline command= so
 # supervisor's shlex tokenizer never has to parse the shell logic)
 COPY --chmod=755 docker/worker-command.sh /usr/local/bin/worker-command.sh
 
 # Entrypoint init scripts (run by the serversideup ENTRYPOINT before the CMD)
 COPY --chmod=755 docker/entrypoint.d/ /etc/entrypoint.d/
+# Prepare fresh root-owned volumes when the host overrides the image's USER,
+# then drop privileges before Laravel initialization and process supervision.
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/sm-manager-entrypoint
+ENTRYPOINT ["/usr/local/bin/sm-manager-entrypoint"]
 
 # Application source
 COPY --chown=www-data:www-data . .
@@ -223,6 +230,10 @@ RUN composer dump-autoload --no-plugins --no-scripts \
     && php artisan package:discover --ansi
 
 USER www-data
+
+EXPOSE 8080
+HEALTHCHECK --start-period=30s --interval=30s --timeout=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8080/up || exit 1
 
 # Default entry point: supervisord runs Octane + worker + scheduler (+ SSR when
 # toggled). Override the CMD to run a single process, e.g. for a cloud worker:

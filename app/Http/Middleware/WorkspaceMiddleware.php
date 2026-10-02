@@ -47,22 +47,23 @@ class WorkspaceMiddleware
     }
 
     /**
-     * The workspace this request is bound to, repairing a null
-     * current_workspace_id where the user still belongs somewhere.
+     * The workspace this request is bound to, repairing a missing or revoked
+     * current_workspace_id before route-model binding and shared data resolve.
      */
     private function resolveWorkspaceId(User $user): string
     {
-        if ($user->current_workspace_id) {
+        if ($user->isMemberOfWorkspace($user->current_workspace_id)) {
             return (string) $user->current_workspace_id;
         }
 
-        // Leaving a workspace nulls current_workspace_id even when the user is
-        // still a member of others, which would otherwise leave them bound to
-        // nothing until they switched manually.
         $fallback = $user->workspaceMemberships()->value('workspace_id');
 
-        if ($fallback) {
+        if ($user->current_workspace_id !== $fallback) {
             $user->forceFill(['current_workspace_id' => $fallback])->save();
+        }
+        $user->unsetRelation('currentWorkspace');
+
+        if ($fallback) {
 
             return (string) $fallback;
         }

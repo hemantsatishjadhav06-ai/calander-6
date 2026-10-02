@@ -21,6 +21,10 @@ const NONE: PostCapabilities = {
 };
 
 export function postCapabilities(post: PostView): PostCapabilities {
+    const reviewRequired = post.approval?.required ?? false;
+    const approved =
+        post.approval?.status === 'approved' &&
+        post.approval.reviewed_revision === post.approval.revision;
     // Tolerate partial Inertia payloads that omit targets (e.g. lighter feed rows).
     const hasFailedTarget = (post.targets ?? []).some(
         (t) => t.status === 'failed',
@@ -30,7 +34,7 @@ export function postCapabilities(post: PostView): PostCapabilities {
             return {
                 ...NONE,
                 canEdit: true,
-                canSchedule: true,
+                canSchedule: !reviewRequired,
                 canDelete: true,
             };
         case 'scheduled':
@@ -38,7 +42,7 @@ export function postCapabilities(post: PostView): PostCapabilities {
             // still be changed (reschedule/unschedule) or the post discarded.
             return {
                 ...NONE,
-                canReschedule: true,
+                canReschedule: !reviewRequired,
                 canUnschedule: true,
                 canDelete: true,
             };
@@ -47,7 +51,7 @@ export function postCapabilities(post: PostView): PostCapabilities {
             // it back into the pipeline (→ scheduled) or discard it.
             return {
                 ...NONE,
-                canReschedule: true,
+                canReschedule: !reviewRequired,
                 canDelete: true,
                 canDuplicate: true,
             };
@@ -57,7 +61,7 @@ export function postCapabilities(post: PostView): PostCapabilities {
             return {
                 ...NONE,
                 canDelete: true,
-                canRetry: hasFailedTarget,
+                canRetry: hasFailedTarget && (!reviewRequired || approved),
                 canDuplicate: true,
             };
         default:

@@ -22,11 +22,9 @@ test('exchanges a short lived token for a long lived one', function () {
         ->and($result['expiresAt'])->not->toBeNull()
         ->and($result['expiresAt']->diffInSeconds(now()->addSeconds(5183944), true))->toBeLessThan(5);
 
-    Http::assertSent(function ($request) {
-        return str_contains($request->url(), '/v25.0/oauth/access_token')
-            && $request['grant_type'] === 'fb_exchange_token'
-            && $request['fb_exchange_token'] === 'SHORT_TOKEN';
-    });
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/v25.0/oauth/access_token')
+        && $request['grant_type'] === 'fb_exchange_token'
+        && $request['fb_exchange_token'] === 'SHORT_TOKEN');
 });
 
 test('lists pages with a linked instagram account', function () {

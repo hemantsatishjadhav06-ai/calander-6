@@ -2,10 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\PostStatus;
+use App\Models\ConnectedAccount;
 use App\Models\Post;
+use App\Models\PostMedia;
 use App\Models\PostShare;
+use App\Models\PostTarget;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceMembership;
+use Illuminate\Support\Facades\Storage;
 
 function shareFor(string $token, ?callable $state = null): PostShare
 {
@@ -42,4 +48,33 @@ it('shows not-available for unknown / revoked / expired tokens', function (): vo
 
     shareFor('expired-token', fn ($f) => $f->expired());
     $this->get('/share/expired-token')->assertInertia(fn ($page) => $page->where('post', null));
+});
+
+it('stops exposing a shared post after it is retained for remote deletion', function (): void {
+    $share = shareFor('deleted-token');
+    $share->post->forceFill(['status' => PostStatus::Deleted, 'deleted_at' => now()])->save();
+
+    $this->get('/share/deleted-token')->assertInertia(fn ($page) => $page->where('post', null));
+});
+
+it('shows the shared media and accounts to a member of a different workspace', function (): void {
+    Storage::fake('public');
+    $share = shareFor('cross-workspace-token');
+    $account = ConnectedAccount::factory()->create([
+        'workspace_id' => $share->post->workspace_id,
+        'handle' => 'shared-account',
+    ]);
+    PostTarget::factory()->for($share->post)->create(['connected_account_id' => $account->id]);
+    $media = PostMedia::factory()->for($share->post)->create([
+        'workspace_id' => $share->post->workspace_id,
+        'disk' => 'public',
+    ]);
+    $otherWorkspace = Workspace::factory()->create();
+    $viewer = User::factory()->create(['current_workspace_id' => $otherWorkspace->id]);
+    WorkspaceMembership::factory()->create(['workspace_id' => $otherWorkspace->id, 'user_id' => $viewer->id]);
+
+    $this->actingAs($viewer)->get('/share/cross-workspace-token')
+        ->assertInertia(fn ($page) => $page
+            ->where('post.targets.0.handle', 'shared-account')
+            ->where('post.media.0.id', $media->id));
 });

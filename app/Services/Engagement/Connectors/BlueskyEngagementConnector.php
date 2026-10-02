@@ -17,6 +17,7 @@ use App\Models\PostTargetReply;
 use App\Services\Atproto\DPoP;
 use App\Services\Engagement\Contracts\EngagementConnector;
 use App\Services\Usage\Concerns\TracksUsage;
+use App\Support\PublicHttpUrl;
 use App\Support\RetryAfter;
 use App\Support\UsageOperation;
 use Carbon\CarbonImmutable;
@@ -27,6 +28,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class BlueskyEngagementConnector implements EngagementConnector
 {
@@ -39,6 +41,7 @@ class BlueskyEngagementConnector implements EngagementConnector
     public function __construct(
         private readonly HttpFactory $http,
         private readonly DPoP $dpop,
+        private readonly PublicHttpUrl $urls,
     ) {}
 
     /**
@@ -47,15 +50,16 @@ class BlueskyEngagementConnector implements EngagementConnector
     private function authorized(string $method, string $url, string $jwt, array $session, ?string $nonce = null): PendingRequest
     {
         $key = $session['dpop_private_jwk'] ?? null;
+        $request = $this->http->withOptions($this->urls->options($url))->timeout(30)->connectTimeout(5);
 
         if (is_array($key)) {
-            return $this->http->withHeaders([
+            return $request->withHeaders([
                 'Authorization' => 'DPoP '.$jwt,
                 'DPoP' => $this->dpop->proof($method, $url, $key, $jwt, $nonce ?? $session['dpop_nonce'] ?? null),
             ]);
         }
 
-        return $this->http->withToken($jwt);
+        return $request->withToken($jwt);
     }
 
     /**
@@ -444,7 +448,7 @@ class BlueskyEngagementConnector implements EngagementConnector
 }
 
 /** @internal */
-final class BlueskyReplyMediaFailed extends \RuntimeException
+final class BlueskyReplyMediaFailed extends RuntimeException
 {
     public function __construct(public readonly int $status)
     {

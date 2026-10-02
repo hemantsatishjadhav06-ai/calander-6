@@ -29,6 +29,7 @@ function seedNotifications(User $user, string $workspaceId, int $count): void
 test('the feed returns only the first page and a cursor when more exist', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     seedNotifications($user, $ws->id, NotificationPresenter::PER_PAGE + 5);
 
@@ -42,6 +43,7 @@ test('the feed returns only the first page and a cursor when more exist', functi
 test('following the cursor returns the remaining notifications and then stops', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     $total = NotificationPresenter::PER_PAGE + 5;
     seedNotifications($user, $ws->id, $total);
@@ -67,6 +69,7 @@ test('the feed is scoped to the current workspace', function () {
     $user = User::factory()->create();
     $wsA = Workspace::factory()->create();
     $wsB = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $wsA->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $wsA->id])->save();
     seedNotifications($user, $wsA->id, 2);
     seedNotifications($user, $wsB->id, 3);
@@ -90,7 +93,7 @@ test('a foreign cursor on another cursor-paginated page does not break the share
         'role' => WorkspaceRole::Owner,
     ]);
 
-    $foreignCursor = (new Cursor(['id' => 'not-a-notification-cursor'], true))->encode();
+    $foreignCursor = new Cursor(['id' => 'not-a-notification-cursor'], true)->encode();
 
     $this->actingAs($user)
         ->get(route('posts.index', ['cursor' => $foreignCursor]))

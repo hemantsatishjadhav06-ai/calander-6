@@ -332,6 +332,9 @@ class DraftService
     {
         return DB::transaction(function () use ($post, $data): Post {
             $post = Post::withoutGlobalScopes()->lockForUpdate()->findOrFail($post->id);
+            abort_unless($post->status->isEditable(), 422, 'This post can no longer be edited.');
+            app(PostApprovalService::class)->assertReviewable($post);
+            $reviewRevision = app(PostApprovalService::class)->revision($post);
 
             if ($data->expectedUpdatedAt !== null
                 && $post->updated_at->toIso8601String() !== Date::parse($data->expectedUpdatedAt)->toIso8601String()) {
@@ -387,6 +390,9 @@ class DraftService
             }
             $this->syncTargets($post, $accountIds, $data->segments, $autoSplitByAccount, $overrideByAccount, $post->mentions ?? [], $formatByAccount, $data);
 
+            if (! hash_equals($reviewRevision, app(PostApprovalService::class)->revision($post))) {
+                app(PostApprovalService::class)->invalidate($post);
+            }
             $post->touch();
 
             return $post->fresh(['targets', 'media']);
@@ -548,6 +554,8 @@ class DraftService
             PostMedia::withoutGlobalScopes()
                 ->where('workspace_id', $post->workspace_id)
                 ->whereKey($mediaId)
+                ->whereNull('direct_message_id')
+                ->where(fn (Builder $query): Builder => $query->whereNull('post_id')->orWhere('post_id', $post->id))
                 ->update(['post_id' => $post->id, 'position' => $position]);
         }
     }

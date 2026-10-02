@@ -4,23 +4,27 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\PostStatus;
 use App\Enums\PostTargetStatus;
 use App\Jobs\PublishPostTarget;
 use App\Mcp\Tools\Concerns\WorkspaceTool;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Publishing\PostStatusRollup;
 use App\Support\PostView;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Retry a failed or skipped publish target. Outward-facing (re-attempts a live post). Requires confirm=true.')]
 class RetryPostTargetTool extends WorkspaceTool
 {
-    public function handle(Request $request, PostStatusRollup $rollup): Response
+    public function handle(Request $request, PostStatusRollup $rollup, PostApprovalService $approvals): Response
     {
         if ($this->bindWorkspace($request) === null) {
             return Response::error('This connection is not bound to a workspace. Reconnect and select a workspace.');
@@ -41,6 +45,10 @@ class RetryPostTargetTool extends WorkspaceTool
             return $denied;
         }
 
+        if ($post->status === PostStatus::Deleted) {
+            return Response::error('Deleted posts cannot be retried.');
+        }
+
         // Scope the target to this post (and thus this workspace).
         $target = PostTarget::query()->whereKey($validated['target_id'])->where('post_id', $post->id)->first();
         if ($target === null) {
@@ -53,6 +61,12 @@ class RetryPostTargetTool extends WorkspaceTool
 
         if ($unconfirmed = $this->requireConfirmation($request, 'This will re-attempt publishing to the connected account.')) {
             return $unconfirmed;
+        }
+
+        try {
+            $approvals->assertApproved($post);
+        } catch (ValidationException $exception) {
+            return Response::error($exception->getMessage());
         }
 
         $target->forceFill([
@@ -74,6 +88,7 @@ class RetryPostTargetTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

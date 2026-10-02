@@ -11,16 +11,16 @@ use App\Exceptions\TransientTokenRefreshException;
 use App\Models\ConnectedAccount;
 use App\Services\Publishing\TokenManager;
 use App\Support\InstanceSettings;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 
+#[Description('Proactively refresh OAuth tokens nearing expiry.')]
+#[Signature('accounts:refresh-tokens')]
 class RefreshExpiringTokens extends Command
 {
-    protected $signature = 'accounts:refresh-tokens';
-
-    protected $description = 'Proactively refresh OAuth tokens nearing expiry.';
-
     public function handle(TokenManager $tokens): int
     {
         $availablePlatforms = array_keys(array_filter(

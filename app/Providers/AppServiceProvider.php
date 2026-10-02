@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Enums\Platform;
+use App\Http\Controllers\OAuth\WorkspaceAuthorizationController;
 use App\Listeners\BindWorkspaceToAccessToken;
 use App\Listeners\SetCurrentWorkspaceOnLogin;
 use App\Listeners\SetSentryUserContext;
@@ -31,6 +32,8 @@ use Inertia\ExceptionResponse;
 use Inertia\Inertia;
 use Laravel\Cashier\Cashier;
 use Laravel\Passport\Events\AccessTokenCreated;
+use Laravel\Passport\Events\AccessTokenRevoked;
+use Laravel\Passport\Http\Controllers\AuthorizationController;
 use Laravel\Passport\Passport;
 use Laravel\Socialite\Facades\Socialite;
 use Override;
@@ -46,6 +49,8 @@ class AppServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
+        $this->app->bind(AuthorizationController::class, WorkspaceAuthorizationController::class);
+
         // Both classes take $maxPixels as a constructor default (a config() call can't be
         // a default expression), so the publish/convert pipeline needs this binding to
         // actually honor the configured decode guard rather than always falling back to
@@ -117,6 +122,7 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, SetCurrentWorkspaceOnLogin::class);
         Event::listen(AccessTokenCreated::class, BindWorkspaceToAccessToken::class);
+        Event::listen(AccessTokenRevoked::class, [BindWorkspaceToAccessToken::class, 'captureRefreshBinding']);
         Event::listen(Authenticated::class, SetSentryUserContext::class);
 
         Passport::authorizationView(
@@ -241,9 +247,9 @@ class AppServiceProvider extends ServiceProvider
      * `{media}` resolves the same way for posts, replies and conversations, so
      * it is bound once here rather than restated in each route file.
      *
-     * Route-model binding runs before WorkspaceMiddleware sets the Context, so
-     * the lookup scopes to the authed user's current workspace explicitly (a
-     * foreign id 404s) instead of relying on PostMedia's global scope.
+     * WorkspaceMiddleware validates membership before route-model binding.
+     * Keep the lookup explicitly scoped to the user's current workspace so a
+     * foreign id 404s without leaking existence.
      */
     private function bindWorkspaceMedia(): void
     {

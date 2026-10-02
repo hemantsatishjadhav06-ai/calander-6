@@ -3,25 +3,28 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
 use Illuminate\Database\Eloquent\Model;
+use Override;
 
 /**
  * @property string $key
  * @property mixed $value
  */
 #[Fillable(['key', 'value'])]
+#[WithoutIncrementing]
 class InstanceSetting extends Model
 {
-    public $incrementing = false;
-
+    #[Override]
     protected $primaryKey = 'key';
 
+    #[Override]
     protected $keyType = 'string';
 
     /**
      * @return array<string, string>
      */
-    #[\Override]
+    #[Override]
     protected function casts(): array
     {
         return [

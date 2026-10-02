@@ -6,6 +6,7 @@ namespace App\Http\Controllers\ConnectedAccounts;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
+use App\Services\ConnectedAccounts\AccountConnectionIntent;
 use App\Services\ConnectedAccounts\AccountConnectionService;
 use App\Services\ConnectedAccounts\BlueskyOAuthConnector;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +21,7 @@ class BlueskyOAuthController extends Controller
     public function __construct(
         private readonly BlueskyOAuthConnector $connector,
         private readonly AccountConnectionService $connections,
+        private readonly AccountConnectionIntent $intents,
     ) {}
 
     public function redirect(Request $request): RedirectResponse
@@ -46,7 +48,10 @@ class BlueskyOAuthController extends Controller
             return redirect()->route('accounts.index')->with('error', $exception->getMessage());
         }
 
-        $request->session()->put(self::SESSION_KEY.'.'.$authorization['state'], $authorization['context']);
+        $request->session()->put(self::SESSION_KEY.'.'.$authorization['state'], [
+            ...$authorization['context'],
+            'connection_intent' => $this->intents->create($request, $authorization['state']),
+        ]);
 
         return redirect()->away($authorization['url']);
     }
@@ -57,7 +62,7 @@ class BlueskyOAuthController extends Controller
         $host = parse_url($callback, PHP_URL_HOST);
 
         if (app()->isLocal() && in_array($host, ['127.0.0.1', '::1', 'localhost'], true)) {
-            $appHost = parse_url(config('app.url'), PHP_URL_HOST);
+            $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
 
             if (! in_array($appHost, ['127.0.0.1', '::1', 'localhost'], true)) {
                 return route('oauth.bluesky.metadata');
@@ -80,10 +85,13 @@ class BlueskyOAuthController extends Controller
             return redirect()->route('accounts.index')->with('error', 'Bluesky did not authorize the connection.');
         }
 
-        $state = (string) $request->query('state');
+        $state = $request->query('state');
+        if (! is_string($state) || preg_match('/\A[A-Za-z0-9]{64}\z/', $state) !== 1) {
+            return redirect()->route('accounts.index')->with('error', 'Bluesky OAuth state expired. Please try again.');
+        }
         $context = $request->session()->pull(self::SESSION_KEY.'.'.$state);
 
-        if (! is_array($context)) {
+        if (! is_array($context) || ! $this->intents->isValid($request, $context['connection_intent'] ?? null)) {
             return redirect()->route('accounts.index')->with('error', 'Bluesky OAuth state expired. Please try again.');
         }
 

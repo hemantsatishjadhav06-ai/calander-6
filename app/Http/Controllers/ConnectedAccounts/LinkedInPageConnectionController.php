@@ -8,6 +8,7 @@ use App\Dto\ConnectedAccount\ConnectedAccountData;
 use App\Enums\Platform;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
+use App\Services\ConnectedAccounts\AccountConnectionIntent;
 use App\Services\ConnectedAccounts\AccountConnectionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -25,7 +26,10 @@ class LinkedInPageConnectionController extends Controller
 {
     private const string SESSION_KEY = 'accounts.linkedin.connect';
 
-    public function __construct(private readonly AccountConnectionService $connections) {}
+    public function __construct(
+        private readonly AccountConnectionService $connections,
+        private readonly AccountConnectionIntent $intents,
+    ) {}
 
     public function store(Request $request): RedirectResponse
     {
@@ -33,7 +37,7 @@ class LinkedInPageConnectionController extends Controller
 
         $stash = $request->session()->get(self::SESSION_KEY);
 
-        if (! is_array($stash)) {
+        if (! is_array($stash) || ! $this->intents->isValid($request, $stash['connection_intent'] ?? null)) {
             return redirect()->route('accounts.index')->with('error', 'Your LinkedIn connection expired. Please try again.');
         }
 

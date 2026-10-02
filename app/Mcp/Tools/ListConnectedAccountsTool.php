@@ -11,6 +11,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('List connected social accounts (X, LinkedIn, Bluesky) in the bound workspace with their connection status.')]
 class ListConnectedAccountsTool extends WorkspaceTool
@@ -41,6 +42,7 @@ class ListConnectedAccountsTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [];

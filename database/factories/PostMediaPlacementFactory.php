@@ -8,10 +8,12 @@ use App\Models\PostMedia;
 use App\Models\PostMediaPlacement;
 use App\Models\PostTarget;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Override;
 
 /** @extends Factory<PostMediaPlacement> */
 class PostMediaPlacementFactory extends Factory
 {
+    #[Override]
     protected $model = PostMediaPlacement::class;
 
     /**

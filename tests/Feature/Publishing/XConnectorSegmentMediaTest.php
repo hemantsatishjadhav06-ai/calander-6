@@ -114,7 +114,7 @@ test('an image on one section and a video on another both publish, resolved per 
         ->and($secondRequest['media']['media_ids'] ?? null)->toBe(['77']);
 
     // No chunked initialize call — the video's already-processed state was reused.
-    Http::assertNotSent(fn ($req) => str_contains($req->url(), '/media/upload/initialize'));
+    Http::assertNotSent(fn ($req) => str_contains((string) $req->url(), '/media/upload/initialize'));
 });
 
 test('a section with more images than the platform cap is trimmed locally, not rejected by the API', function (): void {

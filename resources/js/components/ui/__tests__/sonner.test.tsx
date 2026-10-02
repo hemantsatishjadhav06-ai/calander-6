@@ -1,6 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { toast } from 'sonner';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 
 import { Toaster } from '@/components/ui/sonner';
 
@@ -18,6 +26,17 @@ beforeAll(() => {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
     }) as unknown as typeof window.matchMedia;
+});
+
+// Sonner replays active global-store toasts on mount, including fixtures from
+// earlier cases. Unmounting the React tree does not dismiss those toasts.
+beforeEach(() => {
+    toast.dismiss();
+    expect(toast.getToasts()).toHaveLength(0);
+});
+
+afterEach(() => {
+    toast.dismiss();
 });
 
 const INTENTS = [
@@ -57,6 +76,7 @@ describe('Toaster intent styling contract', () => {
     it('renders a structurally distinct icon per intent', async () => {
         render(<Toaster />);
         INTENTS.forEach(({ fire, message }) => fire(message));
+        expect(toast.getToasts()).toHaveLength(INTENTS.length);
 
         const icons: string[] = [];
 

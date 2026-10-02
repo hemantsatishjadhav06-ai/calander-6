@@ -6,17 +6,20 @@ namespace App\Console\Commands;
 
 use App\Enums\PostStatus;
 use App\Models\Post;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Publishing\PublishDispatcher;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
+#[Description('Claim due scheduled posts and dispatch their per-target publish jobs.')]
+#[Signature('posts:dispatch-due')]
 class DispatchDuePosts extends Command
 {
-    protected $signature = 'posts:dispatch-due';
-
-    protected $description = 'Claim due scheduled posts and dispatch their per-target publish jobs.';
-
-    public function handle(PublishDispatcher $dispatcher): int
+    public function handle(PublishDispatcher $dispatcher, PostApprovalService $approvals): int
     {
         $now = Date::now();
         $cutoff = $now->copy()->subMinutes((int) config('posts.missed_after_minutes'));
@@ -42,21 +45,37 @@ class DispatchDuePosts extends Command
         }
 
         foreach ($candidateIds as $id) {
-            // Per-row atomic claim: the conditional update flips exactly the rows still
-            // `scheduled`, so it returns 1 only for the run that actually won the claim.
-            // We fan out ONLY for those, never picking up another run's already-claimed rows.
-            $claimed = Post::query()
-                ->withoutGlobalScopes()
-                ->where('id', $id)
-                ->where('status', PostStatus::Scheduled->value)
-                ->update(['status' => PostStatus::Publishing->value]);
+            DB::transaction(function () use ($id, $dispatcher, $approvals, $cutoff, $now): void {
+                $post = Post::query()->withoutGlobalScopes()->whereKey($id)
+                    ->where('status', PostStatus::Scheduled->value)
+                    ->whereBetween('scheduled_at', [$cutoff, $now])
+                    ->lockForUpdate()->first();
 
-            if ($claimed !== 1) {
-                continue;
-            }
+                if ($post === null || $post->status !== PostStatus::Scheduled) {
+                    return;
+                }
 
-            $post = Post::query()->withoutGlobalScopes()->where('id', $id)->firstOrFail();
-            $dispatcher->dispatchForPost($post);
+                try {
+                    $approvals->assertPlan($post, $post->scheduled_at);
+                } catch (ValidationException) {
+                    return;
+                }
+
+                // The default database queue writes its jobs in this transaction, so
+                // an interrupted fan-out rolls back both the claim and queued jobs.
+                $claimed = Post::query()
+                    ->withoutGlobalScopes()
+                    ->where('id', $id)
+                    ->where('status', PostStatus::Scheduled->value)
+                    ->update(['status' => PostStatus::Publishing->value]);
+
+                if ($claimed !== 1) {
+                    return;
+                }
+
+                $post = Post::query()->withoutGlobalScopes()->where('id', $id)->firstOrFail();
+                $dispatcher->dispatchForPost($post);
+            });
         }
 
         return self::SUCCESS;

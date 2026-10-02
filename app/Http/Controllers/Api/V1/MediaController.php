@@ -8,9 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\PostMedia;
 use App\Services\Posts\MediaStorageService;
+use App\Services\Posts\PostApprovalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class MediaController extends Controller
@@ -50,7 +52,18 @@ class MediaController extends Controller
         $model = PostMedia::query()->whereKey($mediaId)
             ->firstOr(fn () => abort(404, 'No media with that id exists in this workspace.'));
 
-        $model->delete();
+        DB::transaction(function () use ($model): void {
+            $model = PostMedia::query()->whereKey($model->id)->lockForUpdate()->firstOrFail();
+            if ($model->post_id !== null) {
+                $post = Post::withoutGlobalScopes()->whereKey($model->post_id)->lockForUpdate()->first();
+                if ($post !== null) {
+                    abort_unless($post->status->isEditable(), 422, 'This post can no longer be edited.');
+                    app(PostApprovalService::class)->assertReviewable($post);
+                }
+            }
+
+            $model->delete();
+        });
 
         return response()->json(['deleted' => true, 'id' => $mediaId]);
     }

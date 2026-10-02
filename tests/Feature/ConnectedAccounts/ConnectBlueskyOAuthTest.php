@@ -7,8 +7,14 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use App\Services\ConnectedAccounts\BlueskyOAuthConnector;
+use App\Support\PublicHttpUrl;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 function blueskyOAuthOwner(): array
 {
@@ -53,7 +59,8 @@ function fakeDefaultBlueskyOAuthDiscovery(): void
                 'did' => 'did:plc:abc',
             ]),
             str_contains($url, 'plc.directory/did:plc:abc') => Http::response([
-                'service' => [['type' => 'AtprotoPersonalDataServer', 'serviceEndpoint' => 'https://pds.example']],
+                'id' => 'did:plc:abc',
+                'service' => [['id' => '#atproto_pds', 'type' => 'AtprotoPersonalDataServer', 'serviceEndpoint' => 'https://pds.example']],
             ]),
             str_contains($url, 'app.bsky.actor.getProfile') => Http::response([
                 'handle' => 'ada.bsky.social',
@@ -159,6 +166,10 @@ test('bluesky oauth binds an identifier to the expected did when using an advanc
             str_contains($url, 'com.atproto.identity.resolveHandle') => Http::response([
                 'did' => 'did:plc:abc',
             ]),
+            $url === 'https://plc.directory/did:plc:abc' => Http::response([
+                'id' => 'did:plc:abc',
+                'service' => [['id' => '#atproto_pds', 'type' => 'AtprotoPersonalDataServer', 'serviceEndpoint' => 'https://pds.example']],
+            ]),
             $url === 'https://pds.example/.well-known/oauth-protected-resource' => Http::response([
                 'authorization_servers' => ['https://auth.example'],
             ]),
@@ -249,6 +260,28 @@ test('bluesky oauth rejects unsafe metadata endpoint urls', function () {
         ->assertSessionHas('error');
 
     Http::assertNotSent(fn (Request $request): bool => $request->url() === 'https://auth.example/oauth/par');
+});
+
+test('bluesky oauth rejects an issuer that differs from its discovered authorization server', function () {
+    blueskyOAuthOwner();
+    Http::fake([
+        'https://pds.example/.well-known/oauth-protected-resource' => Http::response([
+            'authorization_servers' => ['https://auth.example'],
+        ]),
+        'https://auth.example/.well-known/oauth-authorization-server' => Http::response([
+            'issuer' => 'https://bsky.social',
+            'authorization_endpoint' => 'https://auth.example/oauth/authorize',
+            'token_endpoint' => 'https://auth.example/oauth/token',
+            'pushed_authorization_request_endpoint' => 'https://auth.example/oauth/par',
+        ]),
+    ]);
+
+    test()->from(route('accounts.index'))
+        ->get(route('accounts.bluesky.oauth', ['pds_url' => 'https://pds.example']))
+        ->assertRedirect(route('accounts.index'))
+        ->assertSessionHas('error');
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
 });
 
 test('bluesky oauth callback stores an oauth account', function () {

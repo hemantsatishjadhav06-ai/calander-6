@@ -12,6 +12,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 use RuntimeException;
 
 #[Description('Attach an image to the workspace media library by downloading it from a public URL (jpeg, png, webp, gif; max 8 MiB). Returns the media id to use in create_post/update_post media_ids.')]
@@ -53,6 +54,7 @@ class AddPostMediaTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

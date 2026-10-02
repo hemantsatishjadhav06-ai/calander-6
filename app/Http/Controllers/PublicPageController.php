@@ -183,7 +183,7 @@ class PublicPageController extends Controller
      */
     private function mcpToolClasses(): array
     {
-        $tools = (new ReflectionClass(ShoutrrrServer::class))
+        $tools = new ReflectionClass(ShoutrrrServer::class)
             ->getProperty('tools')
             ->getDefaultValue();
 

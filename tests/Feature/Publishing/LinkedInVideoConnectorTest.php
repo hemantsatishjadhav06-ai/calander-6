@@ -57,7 +57,7 @@ test('AVAILABLE video is referenced in the post on resume', function (): void {
     $result = app(LinkedInConnector::class)->publish($ctx);
 
     expect($result->isSuccessful())->toBeTrue()->and($result->remoteIds)->toBe(['urn:li:share:1']);
-    Http::assertNotSent(fn ($req) => str_contains($req->url(), 'action=initializeUpload'));
+    Http::assertNotSent(fn ($req) => str_contains((string) $req->url(), 'action=initializeUpload'));
 });
 
 test('transient 503 on status poll returns MediaProcessing (not ServerError)', function (): void {

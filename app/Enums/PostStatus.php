@@ -36,4 +36,9 @@ enum PostStatus: string
     {
         return $this === self::Draft || $this === self::Scheduled;
     }
+
+    public function isAwaitingPublication(): bool
+    {
+        return $this->isEditable() || $this === self::Missed;
+    }
 }

@@ -86,7 +86,7 @@ test('x skips the user lookup when every counterpart is already expanded', funct
     $result = app(XDirectMessageConnector::class)->fetchConversations($account, ['access_token' => 'tok'], null);
 
     expect($result->conversations[0]->counterpartHandle)->toBe('@alice');
-    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/2/users'));
+    Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), '/2/users'));
 });
 
 test('x leaves a group conversation counterpart unresolved', function () {
@@ -137,7 +137,7 @@ function xDmImage(string $mime = 'image/jpeg', string $name = 'x.jpg'): PostMedi
 function xDmUploadCarried(string $field, string $value): callable
 {
     return function ($request) use ($field, $value): bool {
-        if (! str_contains($request->url(), 'api.x.com/2/media/upload')) {
+        if (! str_contains((string) $request->url(), 'api.x.com/2/media/upload')) {
             return false;
         }
 
@@ -148,13 +148,7 @@ function xDmUploadCarried(string $field, string $value): callable
         // Parts carry a `Content-Length` header between the name and the value, so
         // match the whole part rather than assuming name is immediately followed
         // by value.
-        foreach (preg_split('/--+[A-Za-z0-9]+/', $body) ?: [] as $part) {
-            if (str_contains($part, 'name="'.$field.'"') && str_contains($part, $value)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(preg_split('/--+[A-Za-z0-9]+/', $body) ?: [], fn ($part) => str_contains($part, 'name="'.$field.'"') && str_contains($part, $value));
     };
 }
 
@@ -177,7 +171,7 @@ test('x sendMessage uploads an image as a dm attachment and omits empty text', f
     Http::assertSent(xDmUploadCarried('shared', 'true'));
 
     Http::assertSent(function ($request): bool {
-        if (! str_contains($request->url(), '/messages')) {
+        if (! str_contains((string) $request->url(), '/messages')) {
             return false;
         }
 
@@ -197,7 +191,7 @@ test('x sendMessage sends text alongside an attachment', function () {
     $result = app(XDirectMessageConnector::class)->sendMessage($account, $convo, 'look at this', ['access_token' => 'tok'], [xDmImage()]);
 
     expect($result->isOk())->toBeTrue();
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/messages')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/messages')
         && $request['text'] === 'look at this'
         && ($request['attachments'][0]['media_id'] ?? null) === '112');
 });
@@ -239,12 +233,12 @@ test('x sendMessage uploads a video via chunked initialize/append/finalize as dm
     expect($result->isOk())->toBeTrue();
     expect($result->remoteMessageId)->toBe('sent-vid');
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/media/upload/initialize')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/media/upload/initialize')
         && $request['media_category'] === 'dm_video'
         && $request['shared'] === true);
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/media/upload/222/append'));
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/media/upload/222/finalize'));
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/messages')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/media/upload/222/append'));
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/media/upload/222/finalize'));
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/messages')
         && ($request['attachments'][0]['media_id'] ?? null) === '222');
 });
 
@@ -261,7 +255,7 @@ test('x sendMessage fails without sending when the media upload fails', function
     expect($result->isOk())->toBeFalse();
     expect($result->status)->toBe(EngagementStatus::Failed);
     expect($result->excerpt)->toContain('media too large');
-    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/messages'));
+    Http::assertNotSent(fn ($request): bool => str_contains((string) $request->url(), '/messages'));
 });
 
 test('x sendMessage reports an unsupported media upload as unsupported', function () {
@@ -275,7 +269,7 @@ test('x sendMessage reports an unsupported media upload as unsupported', functio
     $result = app(XDirectMessageConnector::class)->sendMessage($account, $convo, 'hi', ['access_token' => 'tok'], [xDmImage()]);
 
     expect($result->status)->toBe(EngagementStatus::Unsupported);
-    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/messages'));
+    Http::assertNotSent(fn ($request): bool => str_contains((string) $request->url(), '/messages'));
 });
 
 test('x sendMessage reports a slow transcode as retriable rather than blocking the request', function () {
@@ -305,7 +299,7 @@ test('x sendMessage reports a slow transcode as retriable rather than blocking t
     expect($result->status)->toBe(EngagementStatus::RateLimited);
     expect($result->retryAfterSeconds)->toBe(600);
     expect($result->excerpt)->toContain('still being processed');
-    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'dm_conversations'));
+    Http::assertNotSent(fn ($request): bool => str_contains((string) $request->url(), 'dm_conversations'));
 });
 
 // X answers 402 "credits depleted" once the app's API quota is spent. That is

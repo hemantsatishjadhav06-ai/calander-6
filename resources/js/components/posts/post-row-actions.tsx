@@ -20,6 +20,7 @@ import {
 import { MoreHorizontal } from '@/components/ui/icons';
 import { useSchedulingTimezone } from '@/hooks/posts/use-scheduling-timezone';
 import { removeById, replaceById } from '@/lib/optimistic';
+import { canPubliclyShare } from '@/lib/posts/approval';
 import { postCapabilities } from '@/lib/posts/capabilities';
 import { retry as retryRoute } from '@/routes/posts/targets';
 import type { PostView } from '@/types/compose';
@@ -252,7 +253,9 @@ export function PostRowActions({ post }: Props) {
                 <DropdownMenuContent align="end" className="w-48">
                     {caps.canEdit && (
                         <DropdownMenuItem onClick={handleEdit}>
-                            Edit
+                            {post.approval?.required
+                                ? 'Review / schedule'
+                                : 'Edit'}
                         </DropdownMenuItem>
                     )}
                     {caps.canSchedule && (
@@ -277,9 +280,11 @@ export function PostRowActions({ post }: Props) {
                             Unschedule
                         </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={() => setShareOpen(true)}>
-                        Share&hellip;
-                    </DropdownMenuItem>
+                    {canPubliclyShare(post.approval) && (
+                        <DropdownMenuItem onClick={() => setShareOpen(true)}>
+                            Share&hellip;
+                        </DropdownMenuItem>
+                    )}
                     {caps.canDuplicate && (
                         <DropdownMenuItem
                             disabled={duplicating}

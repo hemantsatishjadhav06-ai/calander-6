@@ -4,6 +4,7 @@ use App\Dto\Engagement\ReplyPostResult;
 use App\Enums\Platform;
 use App\Enums\ReplyStatus;
 use App\Enums\WorkspaceRole;
+use App\Jobs\SendReply;
 use App\Models\ConnectedAccount;
 use App\Models\ConnectedAccountSecret;
 use App\Models\Post;
@@ -16,6 +17,7 @@ use App\Models\WorkspaceMembership;
 use App\Services\Engagement\Contracts\EngagementConnector;
 use App\Services\Engagement\EngagementConnectorRegistry;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function (): void {
     $this->workspace = Workspace::factory()->create();
@@ -178,8 +180,11 @@ test('media is rejected on platforms whose comments cannot carry it', function (
 });
 
 test('media is still accepted on x, which does support reply media', function (): void {
+    Queue::fake([SendReply::class]);
     $media = PostMedia::factory()->create(['workspace_id' => $this->workspace->id]);
 
     $this->postJson(route('engagement.respond', $this->reply), ['text' => 'hi', 'media' => [$media->id]])
         ->assertCreated();
+
+    Queue::assertPushed(SendReply::class);
 });

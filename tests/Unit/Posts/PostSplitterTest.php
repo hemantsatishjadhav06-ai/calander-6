@@ -132,7 +132,7 @@ test('section boundaries match the composer preview fixture', function (array $c
     expect($case['limit'])->toBe($platform->maxLength());
 
     $paragraphs = array_map(
-        static fn (array $p): string => str_repeat($p['char'], $p['len']),
+        static fn (array $p): string => str_repeat((string) $p['char'], $p['len']),
         $case['paragraphs'],
     );
 

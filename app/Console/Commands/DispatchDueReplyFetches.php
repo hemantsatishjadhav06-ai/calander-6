@@ -15,15 +15,15 @@ use App\Services\Engagement\Contracts\BatchEngagementConnector;
 use App\Services\Engagement\EngagementConnectorRegistry;
 use App\Services\Engagement\ReplyFetchCadence;
 use App\Support\InstanceSettings;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 
+#[Description('Fan out reply-fetch jobs for due published targets.')]
+#[Signature('engagement:dispatch-due')]
 class DispatchDueReplyFetches extends Command
 {
-    protected $signature = 'engagement:dispatch-due';
-
-    protected $description = 'Fan out reply-fetch jobs for due published targets.';
-
     public function handle(InstanceSettings $settings, ReplyFetchCadence $cadence, EngagementConnectorRegistry $registry): int
     {
         if (! $settings->engagementEnabled() || ! $settings->engagementPollingEnabled()) {
@@ -32,7 +32,7 @@ class DispatchDueReplyFetches extends Command
 
         $enabledPlatforms = array_values(array_filter(
             Platform::cases(),
-            fn (Platform $platform): bool => $settings->engagementPollingEnabled($platform),
+            $settings->engagementPollingEnabled(...),
         ));
 
         if ($enabledPlatforms === []) {

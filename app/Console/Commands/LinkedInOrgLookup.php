@@ -7,14 +7,14 @@ namespace App\Console\Commands;
 use App\Enums\Platform;
 use App\Models\ConnectedAccount;
 use App\Services\Publishing\LinkedInOrgResolver;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
+#[Description('Resolve a LinkedIn organization reference to its URN + canonical name, and probe whether this app has org-lookup (Community Management API) access.')]
+#[Signature('linkedin:org-lookup {reference : company URL, vanity slug, org URN, or numeric id} {--account= : ConnectedAccount id; defaults to the first connected LinkedIn account}')]
 class LinkedInOrgLookup extends Command
 {
-    protected $signature = 'linkedin:org-lookup {reference : company URL, vanity slug, org URN, or numeric id} {--account= : ConnectedAccount id; defaults to the first connected LinkedIn account}';
-
-    protected $description = 'Resolve a LinkedIn organization reference to its URN + canonical name, and probe whether this app has org-lookup (Community Management API) access.';
-
     public function handle(LinkedInOrgResolver $resolver): int
     {
         $account = $this->resolveAccount();

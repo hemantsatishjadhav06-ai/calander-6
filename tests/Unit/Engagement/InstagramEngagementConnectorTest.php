@@ -54,7 +54,7 @@ test('fetchReplies maps comments to FetchedReply', function () {
     expect($result->replies[0]->text)->toBe('nice post');
     expect($result->replies[0]->remoteCreatedAt)->toBeInstanceOf(CarbonImmutable::class);
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/MEDIA1/comments')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/MEDIA1/comments')
         && str_contains((string) $req['fields'], 'username'));
 });
 
@@ -82,7 +82,7 @@ test('postReply posts a reply and returns the id', function () {
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('C2');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/C1/replies')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/C1/replies')
         && $req['message'] === 'thanks!'
         && $req['access_token'] === 't');
 });
@@ -120,7 +120,7 @@ test('likeReply likes the comment via the user-scoped likes edge', function () {
     expect($result->isOk())->toBeTrue();
 
     Http::assertSent(fn ($req) => $req->method() === 'POST'
-        && str_contains($req->url(), '/IGUSER1/likes')
+        && str_contains((string) $req->url(), '/IGUSER1/likes')
         && $req['comment_id'] === 'C1'
         && $req['access_token'] === 't');
 });
@@ -152,7 +152,7 @@ test('unlikeReply unlikes the comment via the user-scoped likes edge', function 
     expect($result->isOk())->toBeTrue();
 
     Http::assertSent(fn ($req) => $req->method() === 'DELETE'
-        && str_contains($req->url(), '/IGUSER1/likes')
+        && str_contains((string) $req->url(), '/IGUSER1/likes')
         && $req['comment_id'] === 'C1'
         && $req['access_token'] === 't');
 });
@@ -169,5 +169,5 @@ test('deleteReply deletes the comment', function () {
 
     expect($result->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains($req->url(), '/C1'));
+    Http::assertSent(fn ($req) => $req->method() === 'DELETE' && str_contains((string) $req->url(), '/C1'));
 });

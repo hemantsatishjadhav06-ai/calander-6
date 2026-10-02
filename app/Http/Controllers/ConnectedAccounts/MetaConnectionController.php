@@ -8,6 +8,7 @@ use App\Dto\ConnectedAccount\ConnectedAccountData;
 use App\Enums\Platform;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
+use App\Services\ConnectedAccounts\AccountConnectionIntent;
 use App\Services\ConnectedAccounts\AccountConnectionService;
 use App\Services\ConnectedAccounts\Meta\MetaAssetEnumerator;
 use App\Support\InstanceSettings;
@@ -31,11 +32,9 @@ use Throwable;
  * (Facebook, Instagram), enumerates the user's Pages/linked IG assets, and
  * lets them pick which assets to connect as which platform.
  *
- * OAuth is intentionally stateless: this route is already behind `auth`, and
- * connecting still requires an explicit POST on the selection screen. Socialite
- * session "state" is unreliable behind TLS-terminating tunnels/proxies and also
- * races when Facebook (or the browser) hits the callback twice — the second hit
- * then fails with "authorization code has been used".
+ * A session-bound OAuth state pins the connection to the initiating user and
+ * workspace. The callback validates that state independently of Socialite so a
+ * duplicate callback can safely reuse the already exchanged asset picker.
  */
 class MetaConnectionController extends Controller
 {
@@ -45,6 +44,7 @@ class MetaConnectionController extends Controller
         private readonly MetaAssetEnumerator $enumerator,
         private readonly AccountConnectionService $connections,
         private readonly InstanceSettings $settings,
+        private readonly AccountConnectionIntent $intents,
     ) {}
 
     public function redirect(Request $request): Response
@@ -60,12 +60,13 @@ class MetaConnectionController extends Controller
         // setScopes (not scopes): Socialite's Facebook driver defaults include
         // `email`, which Facebook Login now rejects as invalid for this app
         // type. We only want Page/IG Graph permissions from Platform::scopes().
-        // stateless(): see class docblock — auth + selection POST is our CSRF gate.
-        return $this->driver()
-            ->stateless()
+        $response = $this->driver()
             ->setScopes($this->scopes())
             ->redirectUrl(route('accounts.meta.callback'))
             ->redirect();
+        $this->intents->rememberRedirect($request, 'meta', $response);
+
+        return $response;
     }
 
     /**
@@ -88,6 +89,10 @@ class MetaConnectionController extends Controller
     public function callback(Request $request): RedirectResponse|InertiaResponse
     {
         $request->user()->can('create', ConnectedAccount::class) ?: abort(403);
+
+        if (! $this->intents->callbackMatches($request, 'meta')) {
+            return $this->failed('This account connection expired or belongs to another workspace. Start again from the intended workspace.');
+        }
 
         if ($request->filled('error')) {
             Log::warning('Meta OAuth provider returned an error.', [
@@ -132,7 +137,6 @@ class MetaConnectionController extends Controller
             Log::warning('Meta OAuth callback failed.', [
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
-                'session_id' => $request->session()->getId(),
                 'has_code' => $request->filled('code'),
             ]);
 
@@ -160,6 +164,7 @@ class MetaConnectionController extends Controller
         }
 
         $request->session()->put(self::SESSION_KEY, [
+            'connection_intent' => $this->intents->current($request, 'meta'),
             'assets' => $stashedAssets,
             'userTokenExpiresAt' => $longLived['expiresAt']?->toIso8601String(),
         ]);
@@ -173,8 +178,11 @@ class MetaConnectionController extends Controller
         $request->user()->can('create', ConnectedAccount::class) ?: abort(403);
 
         $stash = $request->session()->get(self::SESSION_KEY);
+        if (! is_array($stash) || ! $this->intents->isValid($request, $stash['connection_intent'] ?? null)) {
+            return $this->failed('This account connection expired or belongs to another workspace. Start again from the intended workspace.');
+        }
         /** @var array<string, array{pageId: string, pageName: string, pageAccessToken: string, igUserId: ?string, igUsername: ?string, igAvatarUrl: ?string}> $stashedAssets */
-        $stashedAssets = is_array($stash) ? ($stash['assets'] ?? []) : [];
+        $stashedAssets = $stash['assets'] ?? [];
 
         $launchedPlatforms = array_map(
             fn (Platform $platform): string => $platform->value,
@@ -362,7 +370,8 @@ class MetaConnectionController extends Controller
     {
         $stash = $request->session()->get(self::SESSION_KEY);
 
-        return is_array($stash) && is_array($stash['assets'] ?? null) && $stash['assets'] !== [];
+        return is_array($stash) && $this->intents->isValid($request, $stash['connection_intent'] ?? null)
+            && is_array($stash['assets'] ?? null) && $stash['assets'] !== [];
     }
 
     private function renderAssetPicker(Request $request): InertiaResponse
@@ -387,12 +396,14 @@ class MetaConnectionController extends Controller
     /**
      * Exchange the Facebook authorization code for a Socialite user.
      *
-     * Always stateless: see class docblock. Auth middleware + the selection
-     * POST are the real CSRF gates for this account-linking flow.
+     * The callback already verified the session-bound connection state before
+     * reaching this exchange. Avoid consuming Socialite's shared state here so
+     * duplicate callbacks can render the same validated picker.
      */
     private function resolveOAuthUser(Request $request): SocialiteUser
     {
-        $oauthUser = $this->driver()
+        $provider = clone $this->driver();
+        $oauthUser = $provider
             ->stateless()
             ->redirectUrl(route('accounts.meta.callback'))
             ->user();
