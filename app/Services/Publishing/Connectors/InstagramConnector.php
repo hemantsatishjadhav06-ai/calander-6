@@ -73,7 +73,7 @@ class InstagramConnector implements PublishConnector
 
         $igUserId = (string) $context->account->remote_account_id;
         $caption = implode("\n\n", array_values(array_filter(
-            array_map(static fn (string $segment): string => trim($segment), $context->segments),
+            array_map(trim(...), $context->segments),
             static fn (string $segment): bool => $segment !== '',
         )));
 

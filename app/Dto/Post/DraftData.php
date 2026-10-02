@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto\Post;
 
-final class DraftData
+final readonly class DraftData
 {
     /**
      * Per-account inputs keyed by account id. A key is present in an entry only
@@ -22,43 +22,43 @@ final class DraftData
      */
     public function __construct(
         /** @var list<string> */
-        public readonly array $segments,
-        public readonly string $destinationKind,
-        public readonly ?string $destinationId,
-        public readonly array $destinationIds,
-        public readonly array $mediaIds,
-        public readonly array $mentions,
-        public readonly array $targetsByAccount,
-        public readonly ?string $expectedUpdatedAt,
-        public readonly ?bool $autoRepost = null,
+        public array $segments,
+        public string $destinationKind,
+        public ?string $destinationId,
+        public array $destinationIds,
+        public array $mediaIds,
+        public array $mentions,
+        public array $targetsByAccount,
+        public ?string $expectedUpdatedAt,
+        public ?bool $autoRepost = null,
         /**
          * Whether the payload carried an `auto_repost` key at all. Distinguishes
          * "set the override to null" from "leave the stored override untouched"
          * so partial updates (MCP / API edits that never mention boosting) don't
          * silently reset a user's per-post choice.
          */
-        public readonly bool $autoRepostProvided = false,
-        public readonly array $segmentBreaks = [],
-        public readonly array $placements = [],
+        public bool $autoRepostProvided = false,
+        public array $segmentBreaks = [],
+        public array $placements = [],
         /**
          * Whether the payload carried a top-level `segment_breaks` key. Like
          * {@see $autoRepostProvided}, this distinguishes "clear all breaks" from
          * "leave the stored breaks untouched" so a partial edit (an MCP text-only
          * change never sends breaks) doesn't silently reset the thread structure.
          */
-        public readonly bool $segmentBreaksProvided = false,
+        public bool $segmentBreaksProvided = false,
         /**
          * Whether the payload carried a top-level `placements` key. Guards partial
          * updates from deleting all per-thread media placements — see
          * {@see $segmentBreaksProvided}.
          */
-        public readonly bool $placementsProvided = false,
+        public bool $placementsProvided = false,
         /**
          * Whether the payload carried a top-level `media_ids` key. Guards partial
          * updates from detaching every media row on the post — see
          * {@see $segmentBreaksProvided}.
          */
-        public readonly bool $mediaIdsProvided = false,
+        public bool $mediaIdsProvided = false,
     ) {}
 
     /**

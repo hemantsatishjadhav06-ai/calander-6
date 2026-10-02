@@ -9,12 +9,14 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
+use Override;
 
 /**
  * @extends Factory<ApiKey>
  */
 class ApiKeyFactory extends Factory
 {
+    #[Override]
     protected $model = ApiKey::class;
 
     public function definition(): array

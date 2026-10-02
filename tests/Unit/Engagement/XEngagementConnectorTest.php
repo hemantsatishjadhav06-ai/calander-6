@@ -43,9 +43,9 @@ test('fetchReplies parses the conversation search and resolves authors', functio
 
     // The '@' on the stored handle must be stripped before it reaches the
     // search `from:` operator, otherwise X rejects the query as invalid.
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/2/tweets/search/recent')
-        && str_contains(urldecode($req->url()), 'conversation_id:500 -from:owner')
-        && ! str_contains(urldecode($req->url()), '-from:@'));
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/2/tweets/search/recent')
+        && str_contains(urldecode((string) $req->url()), 'conversation_id:500 -from:owner')
+        && ! str_contains(urldecode((string) $req->url()), '-from:@'));
 });
 
 test('fetchReplies maps 403 to unsupported (no paid tier)', function () {
@@ -65,6 +65,6 @@ test('postReply posts an in_reply_to tweet', function () {
 
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('999');
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/2/tweets')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/2/tweets')
         && $req['reply']['in_reply_to_tweet_id'] === '900');
 });

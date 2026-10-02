@@ -69,12 +69,12 @@ test('instagram publishes a single image through the container flow', function (
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['media-999']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && str_contains((string) $request['image_url'], 'pic.jpg')
         && $request['caption'] === 'look at this');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media_publish')
         && $request['creation_id'] === 'container-1');
 });
 
@@ -96,8 +96,8 @@ test('instagram converts a non-jpeg image and hands Meta the derived jpeg url', 
 
     // Instagram accepts JPEG only (Platform::Instagram->allowedMime()); a .png url is
     // rejected by Meta with "Only image and video media type is allowed".
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && ! str_contains((string) $request['image_url'], '.png')
         && str_contains((string) $request['image_url'], '.jpg'));
 });
@@ -123,7 +123,7 @@ test('instagram returns a MediaProcessing failure and persists the container id 
     $state = $context->target->fresh()->media_upload_state;
     expect($state['container']['remote_ref'])->toBe('container-2');
 
-    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'media_publish'));
+    Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), 'media_publish'));
 });
 
 test('instagram resumes from a persisted container id, skipping re-creation', function () {
@@ -141,8 +141,8 @@ test('instagram resumes from a persisted container id, skipping re-creation', fu
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['media-777']);
 
-    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish'));
+    Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish'));
 
     Http::assertSentCount(2);
 });
@@ -169,20 +169,20 @@ test('instagram builds a carousel from two images then publishes the parent cont
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['media-carousel']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && ($request['is_carousel_item'] ?? null) === 'true'
         && ($request['media_type'] ?? null) === 'IMAGE'
         && str_contains((string) ($request['image_url'] ?? ''), 'a.jpg'));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && ($request['is_carousel_item'] ?? null) === 'true'
         && ($request['media_type'] ?? null) === 'IMAGE'
         && str_contains((string) ($request['image_url'] ?? ''), 'b.jpg'));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && ($request['media_type'] ?? null) === 'CAROUSEL'
         && ($request['children'] ?? null) === 'child-1,child-2'
         && ($request['caption'] ?? null) === 'carousel caption');
@@ -209,8 +209,8 @@ test('instagram sets media_type=VIDEO on a carousel video child container', func
 
     expect($result->isSuccessful())->toBeTrue();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && ($request['is_carousel_item'] ?? null) === 'true'
         && ($request['media_type'] ?? null) === 'VIDEO'
         && str_contains((string) ($request['video_url'] ?? ''), 'clip.mp4'));
@@ -233,8 +233,8 @@ test('instagram publishes a video as a REELS container', function () {
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['reel-media']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && $request['media_type'] === 'REELS'
         && str_contains((string) $request['video_url'], 'clip.mp4'));
 });

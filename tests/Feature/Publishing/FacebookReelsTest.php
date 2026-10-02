@@ -62,15 +62,15 @@ test('a reel drives the video_reels start, upload, and finish phases with the de
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['v-1']);
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/video_reels')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/video_reels')
         && ($r->data()['upload_phase'] ?? null) === 'start');
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), 'rupload.facebook.com')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), 'rupload.facebook.com')
         && $r->hasHeader('Authorization', 'OAuth page-tok')
         && $r->header('offset')[0] === '0'
         && $r->header('file_size')[0] === '30');
 
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/video_reels')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/video_reels')
         && ($r->data()['upload_phase'] ?? null) === 'finish'
         && ($r->data()['video_id'] ?? null) === 'v-1'
         && ($r->data()['description'] ?? null) === 'my reel'
@@ -103,7 +103,7 @@ test('a reel start response missing the video id or upload url fails without per
         ->and($result->errorKind)->toBe(ErrorKind::ServerError);
 
     // No upload attempted, and no bogus resumable state left for a retry to trip on.
-    Http::assertNotSent(fn ($r) => str_contains($r->url(), 'rupload.facebook.com'));
+    Http::assertNotSent(fn ($r) => str_contains((string) $r->url(), 'rupload.facebook.com'));
     expect($context->target->fresh()->media_upload_state)->toBeNull();
 });
 
@@ -156,7 +156,7 @@ test('a reel resume skips the start phase when a video id and upload url are alr
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['v-1']);
 
-    Http::assertNotSent(fn ($r) => str_contains($r->url(), '/video_reels')
+    Http::assertNotSent(fn ($r) => str_contains((string) $r->url(), '/video_reels')
         && ($r->data()['upload_phase'] ?? null) === 'start');
 
     Http::assertSentCount(2);

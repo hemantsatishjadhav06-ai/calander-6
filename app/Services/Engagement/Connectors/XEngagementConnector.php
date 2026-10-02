@@ -26,6 +26,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class XEngagementConnector implements BatchEngagementConnector, EngagementConnector
 {
@@ -595,7 +596,7 @@ class XEngagementConnector implements BatchEngagementConnector, EngagementConnec
  *
  * @internal
  */
-final class XReplyMediaFailed extends \RuntimeException
+final class XReplyMediaFailed extends RuntimeException
 {
     public function __construct(public readonly Response $response)
     {

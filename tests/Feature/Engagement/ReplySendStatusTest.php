@@ -22,7 +22,7 @@ test('send_status is null by default', function () {
 test('a failed reply notification carries the connector reason', function () {
     $reply = PostTargetReply::factory()->create();
 
-    $payload = (new ReplyFailedNotification($reply, 'LinkedIn comments cannot include attachments.'))
+    $payload = new ReplyFailedNotification($reply, 'LinkedIn comments cannot include attachments.')
         ->toArray(new AnonymousNotifiable);
 
     expect($payload['body'])->toBe('LinkedIn comments cannot include attachments.');
@@ -31,7 +31,7 @@ test('a failed reply notification carries the connector reason', function () {
 test('a failed reply notification falls back to the reply text without a reason', function () {
     $reply = PostTargetReply::factory()->create(['text' => 'the original']);
 
-    $payload = (new ReplyFailedNotification($reply))->toArray(new AnonymousNotifiable);
+    $payload = new ReplyFailedNotification($reply)->toArray(new AnonymousNotifiable);
 
     expect($payload['body'])->toBe('the original');
 });

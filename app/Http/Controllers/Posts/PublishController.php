@@ -8,6 +8,7 @@ use App\Enums\PostStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Services\Billing\WorkspaceSubscriptionGate;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Posts\PublishPrecheck;
 use App\Services\Publishing\PublishDispatcher;
 use App\Support\PostView;
@@ -22,8 +23,10 @@ class PublishController extends Controller
         PublishDispatcher $dispatcher,
         WorkspaceSubscriptionGate $subscriptions,
         PublishPrecheck $precheck,
+        PostApprovalService $approvals,
     ): JsonResponse {
         abort_unless($request->user()->can('update', $post), 403);
+        abort_unless($post->status->isAwaitingPublication(), 409, 'This post cannot be published again. Retry failed targets individually.');
 
         $workspace = $post->workspace()->firstOrFail();
 
@@ -48,7 +51,13 @@ class PublishController extends Controller
             ], 422);
         }
 
-        $post->forceFill(['status' => PostStatus::Publishing->value])->save();
+        $approvals->assertPlan($post, null);
+
+        $claimed = Post::query()->whereKey($post->id)
+            ->where('status', $post->status->value)
+            ->update(['status' => PostStatus::Publishing->value]);
+        abort_unless($claimed === 1, 409, 'This post has already changed. Refresh before publishing.');
+        $post->refresh();
 
         $dispatcher->dispatchForPost($post);
 

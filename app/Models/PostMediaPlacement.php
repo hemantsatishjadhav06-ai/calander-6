@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Database\Factories\PostMediaPlacementFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,12 +26,11 @@ use Override;
     'segment_ref',
     'position',
 ])]
+#[Table(name: 'post_media_placements')]
 class PostMediaPlacement extends Model
 {
     /** @use HasFactory<PostMediaPlacementFactory> */
     use HasFactory, HasUuids;
-
-    protected $table = 'post_media_placements';
 
     /**
      * @return array<string, string>

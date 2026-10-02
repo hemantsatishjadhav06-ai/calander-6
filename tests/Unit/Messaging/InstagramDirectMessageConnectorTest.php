@@ -87,7 +87,7 @@ test('instagram send with media posts the attachment before the text', function 
     $attachment = $sent[0][0]->data();
     expect(data_get($attachment, 'message.attachment.type'))->toBe('image')
         ->and(data_get($attachment, 'message.attachment.payload.url'))->toContain('media/ws/pic.jpg')
-        ->and(parse_url(data_get($attachment, 'message.attachment.payload.url'), PHP_URL_SCHEME))->not->toBeNull()
+        ->and(parse_url((string) data_get($attachment, 'message.attachment.payload.url'), PHP_URL_SCHEME))->not->toBeNull()
         ->and(data_get($attachment, 'message.text'))->toBeNull()
         ->and(data_get($attachment, 'recipient.id'))->toBe('igsid-alice');
 

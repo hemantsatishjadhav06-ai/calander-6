@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Engagement;
 
 use App\Dto\Engagement\ReplyFetchResult;
-use App\Jobs\FetchAccountReplies;
-use App\Jobs\FetchPostTargetReplies;
 use App\Models\PostTarget;
 use App\Models\PostTargetReply;
 use App\Notifications\NewRepliesNotification;

@@ -11,6 +11,7 @@ use App\Models\PostTarget;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
+use App\Services\Posts\PostDeletionService;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Queue;
 
@@ -194,8 +195,23 @@ it('forbids deleting a post for a non-member of the workspace', function (): voi
     // An authenticated user pointed at the workspace but with no membership.
     $intruder = User::factory()->create(['current_workspace_id' => $workspace->id]);
 
-    $this->actingAs($intruder)->delete(route('posts.destroy', $post))->assertForbidden();
+    $this->actingAs($intruder)->delete(route('posts.destroy', $post))->assertNotFound();
 
     expect($post->refresh()->status)->toBe(PostStatus::Published);
     Queue::assertNothingPushed();
+});
+
+it('uses current remote ids when deleting a post with stale loaded targets', function (): void {
+    Queue::fake();
+    [, $workspace] = deleteTestMember();
+    $post = Post::factory()->for($workspace)->create(['status' => PostStatus::Publishing]);
+    $target = PostTarget::factory()->for($post)->create(['status' => PostTargetStatus::Publishing]);
+    $post->load('targets');
+    $target->forceFill(['remote_ids' => ['late-remote-id']])->save();
+
+    expect(app(PostDeletionService::class)->delete($post))->toBeTrue();
+
+    expect($target->refresh()->status)->toBe(PostTargetStatus::Deleting)
+        ->and($post->refresh()->status)->toBe(PostStatus::Deleted);
+    Queue::assertPushed(DeletePostTarget::class, fn (DeletePostTarget $job): bool => $job->target->remote_ids === ['late-remote-id']);
 });

@@ -86,7 +86,7 @@ test('browses trending when no query is given', function () {
         ->and($result['items'][0]->slug)->toBe('happy-dance-991')
         ->and($result['items'][0]->title)->toBe('Happy dance');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/test-key/gifs/trending')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/test-key/gifs/trending')
         && $request['rating'] === 'pg-13'
         && $request['page'] === '1');
 });
@@ -98,7 +98,7 @@ test('browses search when a query is given', function () {
 
     expect($result['has_next'])->toBeTrue();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/test-key/gifs/search')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/test-key/gifs/search')
         && $request['q'] === 'thanks'
         && $request['page'] === '2');
 });
@@ -117,8 +117,8 @@ test('never sends ad or customer parameters when browsing', function () {
 
     app(KlipyClient::class)->browse('gif', 'thanks', 1);
 
-    Http::assertSent(fn ($request) => ! str_contains($request->url(), 'customer_id')
-        && ! str_contains($request->url(), 'ad-'));
+    Http::assertSent(fn ($request) => ! str_contains((string) $request->url(), 'customer_id')
+        && ! str_contains((string) $request->url(), 'ad-'));
 });
 
 test('sends the customer id when fetching recents', function () {
@@ -126,7 +126,7 @@ test('sends the customer id when fetching recents', function () {
 
     app(KlipyClient::class)->recent('gif', 'cust-abc', 1);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/gifs/recent/cust-abc'));
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/gifs/recent/cust-abc'));
 });
 
 test('throws without leaking the api key when klipy errors', function () {

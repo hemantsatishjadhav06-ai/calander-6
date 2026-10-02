@@ -13,8 +13,14 @@ use App\Services\Media\GifToMp4Converter;
 use App\Services\Media\GifToMp4ConverterUnavailable;
 use App\Services\Media\GifToMp4OutputTooLarge;
 use App\Services\Publishing\Connectors\BlueskyPublishConnector;
+use App\Support\PublicHttpUrl;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 beforeEach(fn () => Storage::fake('public'));
 
@@ -61,7 +67,7 @@ test('completed job embeds the blob and posts on resume', function (): void {
     $result = app(BlueskyPublishConnector::class)->publish($ctx);
 
     expect($result->isSuccessful())->toBeTrue();
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'createRecord')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'createRecord')
         && data_get($req->data(), 'record.embed.$type') === 'app.bsky.embed.video');
 });
 
@@ -98,7 +104,7 @@ test('a resumed publish still embeds video for a not-yet-posted later section', 
 
     expect($result->isSuccessful())->toBeTrue();
 
-    Http::assertSent(fn ($req): bool => str_contains($req->url(), 'createRecord')
+    Http::assertSent(fn ($req): bool => str_contains((string) $req->url(), 'createRecord')
         && data_get($req->data(), 'record.text') === 'second (has video)'
         && data_get($req->data(), 'record.embed.$type') === 'app.bsky.embed.video'
         && data_get($req->data(), 'record.embed.video.ref.$link') === 'vidcid');
@@ -138,10 +144,10 @@ test('gif media is converted to mp4 and embedded as gif video', function (): voi
     expect($result->isSuccessful())->toBeTrue()
         ->and($target->fresh()->media_upload_state[$media->id]['remote_ref'])->toBe('gif-job');
 
-    Http::assertSent(fn ($req): bool => str_contains($req->url(), 'uploadVideo')
-        && str_contains($req->url(), 'name=animation.mp4'));
+    Http::assertSent(fn ($req): bool => str_contains((string) $req->url(), 'uploadVideo')
+        && str_contains((string) $req->url(), 'name=animation.mp4'));
 
-    Http::assertSent(fn ($req): bool => str_contains($req->url(), 'createRecord')
+    Http::assertSent(fn ($req): bool => str_contains((string) $req->url(), 'createRecord')
         && data_get($req->data(), 'record.embed.$type') === 'app.bsky.embed.video'
         && data_get($req->data(), 'record.embed.presentation') === 'gif'
         && data_get($req->data(), 'record.embed.alt') === 'animated chart');
@@ -271,7 +277,7 @@ test('getServiceAuth is called with PDS DID and uploadBlob lxm', function (): vo
     app(BlueskyPublishConnector::class)->publish($ctx);
 
     Http::assertSent(function ($req): bool {
-        if (! str_contains($req->url(), 'getServiceAuth')) {
+        if (! str_contains((string) $req->url(), 'getServiceAuth')) {
             return false;
         }
 

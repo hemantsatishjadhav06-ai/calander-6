@@ -15,6 +15,7 @@ use App\Models\Conversation;
 use App\Models\PostMedia;
 use App\Services\Messaging\Contracts\DirectMessageConnector;
 use App\Services\Usage\Concerns\TracksUsage;
+use App\Support\PublicHttpUrl;
 use App\Support\RetryAfter;
 use App\Support\UsageOperation;
 use Carbon\CarbonImmutable;
@@ -31,7 +32,10 @@ class BlueskyDirectMessageConnector implements DirectMessageConnector
 
     private const string DEFAULT_PDS = 'https://bsky.social';
 
-    public function __construct(private readonly HttpFactory $http) {}
+    public function __construct(
+        private readonly HttpFactory $http,
+        private readonly PublicHttpUrl $urls,
+    ) {}
 
     /** @param array<string, mixed> $credentials */
     public function fetchConversations(ConnectedAccount $account, array $credentials, ?CarbonImmutable $since): ConversationFetchResult
@@ -134,6 +138,7 @@ class BlueskyDirectMessageConnector implements DirectMessageConnector
         $pds = (string) ($session['pds'] ?? self::DEFAULT_PDS);
 
         return $this->http->baseUrl($pds)
+            ->withOptions($this->urls->options($pds))->timeout(10)->connectTimeout(5)
             ->withToken((string) $session['accessJwt'])
             ->withHeaders(['atproto-proxy' => self::PROXY])
             ->acceptJson();

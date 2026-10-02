@@ -1,5 +1,6 @@
 import { Link, router, useHttp, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Bell, Loader2, Trash2 } from '@/components/ui/icons';
@@ -65,6 +66,13 @@ export function NotificationBell() {
     // deriving the count from it would undercount once more pages exist.
     const [unread, setUnread] = useState(initialNotifications.unreadCount);
     const [open, setOpen] = useState(false);
+    const [mutating, setMutating] = useState(false);
+    const mutatingRef = useRef(false);
+    const [lastSynced, setLastSynced] = useState({
+        notifications,
+        open,
+        mutating,
+    });
     const { get, processing } = useHttp<
         Record<string, never>,
         NotificationsData
@@ -78,18 +86,20 @@ export function NotificationBell() {
     // cursor, and count from the freshest first page when it changes. Not while
     // the panel is open, though: rows must not reshuffle under the reader's
     // cursor mid-click. The next close picks the fresh data up.
-    useEffect(() => {
-        if (open) {
-            return;
+    if (
+        lastSynced.notifications !== notifications ||
+        lastSynced.open !== open ||
+        lastSynced.mutating !== mutating
+    ) {
+        setLastSynced({ notifications, open, mutating });
+        if (!open && !mutating) {
+            const locallySyncedNotifications =
+                applyLocalNotificationState(notifications);
+            setItems(locallySyncedNotifications.items);
+            setCursor(locallySyncedNotifications.nextCursor);
+            setUnread(locallySyncedNotifications.unreadCount);
         }
-
-        const locallySyncedNotifications =
-            applyLocalNotificationState(notifications);
-
-        setItems(locallySyncedNotifications.items);
-        setCursor(locallySyncedNotifications.nextCursor);
-        setUnread(locallySyncedNotifications.unreadCount);
-    }, [notifications, open]);
+    }
 
     function loadMore() {
         if (cursor === null || loadingRef.current) {
@@ -115,6 +125,8 @@ export function NotificationBell() {
             onFinish: () => {
                 loadingRef.current = false;
             },
+        }).catch(() => {
+            toast.error('Could not load more notifications. Please try again.');
         });
     }
 
@@ -128,67 +140,123 @@ export function NotificationBell() {
         }
     }
 
+    function mutate(work: () => Promise<unknown>, update: () => void) {
+        if (mutatingRef.current) {
+            return;
+        }
+        const priorItems = items;
+        const priorUnread = unread;
+        const priorReadIds = new Set(readNotificationIds);
+        const priorDeletedIds = new Set(deletedNotificationIds);
+        mutatingRef.current = true;
+        setMutating(true);
+        update();
+        void work()
+            .catch(() => {
+                readNotificationIds.clear();
+                priorReadIds.forEach((id) => readNotificationIds.add(id));
+                deletedNotificationIds.clear();
+                priorDeletedIds.forEach((id) => deletedNotificationIds.add(id));
+                setItems(priorItems);
+                setUnread(priorUnread);
+                toast.error(
+                    'Could not update notifications. Please try again.',
+                );
+            })
+            .finally(() => {
+                mutatingRef.current = false;
+                setMutating(false);
+            });
+    }
+
     function markOneRead(id: string) {
         const wasUnread = items.some((n) => n.id === id && !n.read);
-        readNotificationIds.add(id);
-
-        if (wasUnread) {
-            setUnread((count) => Math.max(0, count - 1));
+        if (!wasUnread) {
+            return;
         }
-        setItems((prev) =>
-            prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        mutate(
+            () => post(markRead(id).url),
+            () => {
+                readNotificationIds.add(id);
+                setUnread((count) => Math.max(0, count - 1));
+                setItems((prev) =>
+                    prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+                );
+            },
         );
-        void post(markRead(id).url);
     }
 
     function markEverythingRead() {
-        items.forEach((notification) => {
-            readNotificationIds.add(notification.id);
-        });
-
-        setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-        setUnread(0);
-        void post(markAllRead().url);
+        mutate(
+            () => post(markAllRead().url),
+            () => {
+                items.forEach((notification) =>
+                    readNotificationIds.add(notification.id),
+                );
+                setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+                setUnread(0);
+            },
+        );
     }
 
     function deleteOne(notification: NotificationItem) {
-        deletedNotificationIds.add(notification.id);
-
-        if (!notification.read) {
-            setUnread((count) => Math.max(0, count - 1));
-        }
-
-        setItems((prev) => prev.filter((n) => n.id !== notification.id));
-
-        void destroy(deleteNotification(notification.id).url);
+        mutate(
+            () => destroy(deleteNotification(notification.id).url),
+            () => {
+                deletedNotificationIds.add(notification.id);
+                if (!notification.read) {
+                    setUnread((count) => Math.max(0, count - 1));
+                }
+                setItems((prev) =>
+                    prev.filter((n) => n.id !== notification.id),
+                );
+            },
+        );
     }
 
     function deleteEverything() {
-        items.forEach((notification) => {
-            deletedNotificationIds.add(notification.id);
-        });
-
-        setItems([]);
-        setUnread(0);
-
-        void destroy(deleteAllNotifications().url);
+        mutate(
+            () => destroy(deleteAllNotifications().url),
+            () => {
+                items.forEach((notification) =>
+                    deletedNotificationIds.add(notification.id),
+                );
+                setItems([]);
+                setUnread(0);
+            },
+        );
     }
 
     function handleAction(
         notification: NotificationItem,
         action: NotificationAction,
     ) {
-        if (!notification.read) {
-            setUnread((count) => Math.max(0, count - 1));
-        }
-
-        setItems((prev) => prev.filter((n) => n.id !== notification.id));
-
-        router.visit(action.href, {
-            method: action.method,
-            preserveScroll: true,
-            preserveState: action.method === 'delete',
-        });
+        mutate(
+            () =>
+                new Promise<void>((resolve, reject) => {
+                    const fail = () =>
+                        reject(new Error('Notification action failed'));
+                    router.visit(action.href, {
+                        method: action.method,
+                        preserveScroll: true,
+                        preserveState: action.method === 'delete',
+                        onSuccess: () => resolve(),
+                        onError: fail,
+                        onCancel: fail,
+                        onHttpException: fail,
+                        onNetworkError: fail,
+                    });
+                }),
+            () => {
+                deletedNotificationIds.add(notification.id);
+                if (!notification.read) {
+                    setUnread((count) => Math.max(0, count - 1));
+                }
+                setItems((prev) =>
+                    prev.filter((n) => n.id !== notification.id),
+                );
+            },
+        );
     }
 
     return (
@@ -224,7 +292,7 @@ export function NotificationBell() {
                             variant="ghost"
                             size="sm"
                             className="h-6 px-2 text-[12px]"
-                            disabled={unread === 0}
+                            disabled={mutating || unread === 0}
                             onClick={markEverythingRead}
                         >
                             Mark all read
@@ -233,7 +301,7 @@ export function NotificationBell() {
                             variant="ghost"
                             size="icon-xs"
                             className="text-muted-foreground hover:text-destructive"
-                            disabled={items.length === 0}
+                            disabled={mutating || items.length === 0}
                             aria-label="Delete all notifications"
                             onClick={deleteEverything}
                         >
@@ -261,6 +329,7 @@ export function NotificationBell() {
                                 <NotificationRow
                                     key={notification.id}
                                     notification={notification}
+                                    disabled={mutating}
                                     onRead={markOneRead}
                                     onDelete={deleteOne}
                                     onAction={handleAction}
@@ -281,11 +350,13 @@ export function NotificationBell() {
 
 function NotificationRow({
     notification,
+    disabled,
     onRead,
     onDelete,
     onAction,
 }: {
     notification: NotificationItem;
+    disabled: boolean;
     onRead: (id: string) => void;
     onDelete: (notification: NotificationItem) => void;
     onAction: (
@@ -327,6 +398,7 @@ function NotificationRow({
                                 type="button"
                                 size="xs"
                                 variant={buttonVariant(action.variant)}
+                                disabled={disabled}
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onAction(notification, action);
@@ -348,6 +420,7 @@ function NotificationRow({
             size="icon-xs"
             className="mt-2.5 mr-2 shrink-0 text-muted-foreground hover:text-destructive"
             aria-label="Delete notification"
+            disabled={disabled}
             onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -376,10 +449,18 @@ function NotificationRow({
     return (
         <div
             role="button"
+            aria-disabled={disabled}
             tabIndex={0}
             className="flex border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
-            onClick={() => onRead(notification.id)}
+            onClick={() => {
+                if (!disabled) {
+                    onRead(notification.id);
+                }
+            }}
             onKeyDown={(e) => {
+                if (disabled) {
+                    return;
+                }
                 if (e.key === 'Enter' || e.key === ' ') {
                     if (e.key === ' ') {
                         e.preventDefault();

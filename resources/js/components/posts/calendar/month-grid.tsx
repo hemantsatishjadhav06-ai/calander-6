@@ -177,7 +177,11 @@ function DayCell({
                         <PostChip
                             key={p.id}
                             post={p}
-                            draggable={!isPast && p.status === 'scheduled'}
+                            draggable={
+                                !isPast &&
+                                p.status === 'scheduled' &&
+                                !p.approval?.required
+                            }
                         />
                     ))}
                     {overflow > 0 && (

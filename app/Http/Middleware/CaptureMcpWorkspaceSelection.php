@@ -8,12 +8,15 @@ use App\Models\McpGrantWorkspace;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
+use Laravel\Passport\Bridge\Client;
+use Laravel\Passport\Bridge\Scope;
+use League\OAuth2\Server\RequestTypes\AuthorizationRequest;
+use League\OAuth2\Server\RequestTypes\AuthorizationRequestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Records the workspace a user picked on the OAuth consent screen, keyed by
- * (user_id, client_id), so the AccessTokenCreated listener can stamp it onto the
- * issued access token. Runs on the consent approval POST only.
+ * Bind each approved authorization code to its selected workspace so separate
+ * consents for the same client cannot overwrite each other.
  */
 class CaptureMcpWorkspaceSelection
 {
@@ -32,13 +35,41 @@ class CaptureMcpWorkspaceSelection
         $workspaceId = $request->string('workspace_id')->toString();
         $clientId = $request->input('client_id') ?? $request->input('client');
 
-        if ($user !== null && $workspaceId !== '' && $clientId !== null && $user->isMemberOfWorkspace($workspaceId)) {
-            McpGrantWorkspace::updateOrCreate(
-                ['user_id' => $user->id, 'client_id' => (string) $clientId, 'access_token_id' => null],
-                ['workspace_id' => $workspaceId],
-            );
+        $serializedAuthorization = $request->hasSession() ? $request->session()->get('authRequest') : null;
+        if (is_string($serializedAuthorization)) {
+            $authorization = unserialize($serializedAuthorization, ['allowed_classes' => [
+                AuthorizationRequest::class,
+                Client::class,
+                Scope::class,
+                \Laravel\Passport\Bridge\User::class,
+            ]]);
+
+            if ($authorization instanceof AuthorizationRequestInterface) {
+                $clientId = $authorization->getClient()->getIdentifier();
+            }
         }
 
-        return $next($request);
+        $response = $next($request);
+
+        $location = $response->headers->get('Location');
+        $query = is_string($location) ? parse_url($location, PHP_URL_QUERY) : null;
+        $parameters = [];
+        if (is_string($query)) {
+            parse_str($query, $parameters);
+        }
+        $code = $parameters['code'] ?? null;
+
+        if ($response->isRedirection() && is_string($code) && $code !== ''
+            && $user !== null && $workspaceId !== '' && $clientId !== null && $user->isMemberOfWorkspace($workspaceId)) {
+            McpGrantWorkspace::create([
+                'user_id' => $user->id,
+                'client_id' => (string) $clientId,
+                'access_token_id' => null,
+                'workspace_id' => $workspaceId,
+                'authorization_code_hash' => hash('sha256', $code),
+            ]);
+        }
+
+        return $response;
     }
 }

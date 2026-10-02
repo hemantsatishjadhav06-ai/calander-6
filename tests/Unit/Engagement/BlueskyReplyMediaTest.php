@@ -4,16 +4,20 @@
 use App\Models\ConnectedAccount;
 use App\Models\PostMedia;
 use App\Models\PostTargetReply;
-use App\Services\Atproto\DPoP;
 use App\Services\Engagement\Connectors\BlueskyEngagementConnector;
-use Illuminate\Http\Client\Factory;
+use App\Support\PublicHttpUrl;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 function bskyConnector(): BlueskyEngagementConnector
 {
-    return new BlueskyEngagementConnector(app(Factory::class), app(DPoP::class));
+    return app(BlueskyEngagementConnector::class);
 }
 
 function bskyCreds(): array
@@ -40,8 +44,8 @@ test('postReply uploads image blobs and attaches an images embed', function () {
     $result = bskyConnector()->postReply($account, $parent, 'hi', bskyCreds(), [$media]);
 
     expect($result->isOk())->toBeTrue();
-    Http::assertSent(fn ($r) => str_contains($r->url(), 'uploadBlob'));
-    Http::assertSent(fn ($r) => str_contains($r->url(), 'createRecord')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), 'uploadBlob'));
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), 'createRecord')
         && ($r['record']['embed']['$type'] ?? '') === 'app.bsky.embed.images');
 });
 
@@ -62,6 +66,6 @@ test('postReply uploads a video and attaches a video embed once the job complete
     $result = bskyConnector()->postReply($account, $parent, 'clip', bskyCreds(), [$media]);
 
     expect($result->isOk())->toBeTrue();
-    Http::assertSent(fn ($r) => str_contains($r->url(), 'createRecord')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), 'createRecord')
         && ($r['record']['embed']['$type'] ?? '') === 'app.bsky.embed.video');
 });

@@ -28,6 +28,7 @@ export type SaveState =
     | 'dirty'
     | 'saving'
     | 'saved'
+    | 'error'
     | 'offline'
     | 'conflict';
 
@@ -97,6 +98,7 @@ export type ComposerAction =
     | { type: 'saveStarted' }
     | { type: 'saveSkippedEmpty' }
     | { type: 'saveSucceeded'; post: PostView }
+    | { type: 'saveFailed' }
     | { type: 'saveFailedOffline' }
     | { type: 'saveFailedStale'; post: PostView }
     | { type: 'resolveConflictUseServer' }
@@ -402,8 +404,12 @@ function hydrate(post: PostView): ComposerState {
         placements: displayPlacements,
         placementsByAccount,
         scheduleTray: {
-            mode: post.scheduled_at ? 'pick' : 'now',
-            pickedAt: post.scheduled_at ?? null,
+            mode:
+                post.approval?.planned_schedule_at || post.scheduled_at
+                    ? 'pick'
+                    : 'now',
+            pickedAt:
+                post.approval?.planned_schedule_at ?? post.scheduled_at ?? null,
         },
         conflict: null,
         autoRepost: post.auto_repost ?? null,
@@ -433,6 +439,8 @@ export function composerReducer(
             if (
                 state.saveState === 'dirty' ||
                 state.saveState === 'saving' ||
+                state.saveState === 'error' ||
+                state.saveState === 'offline' ||
                 state.saveState === 'conflict'
             ) {
                 return state;
@@ -449,7 +457,7 @@ export function composerReducer(
                 ...state,
                 postId: action.postId,
                 baselineUpdatedAt: action.updatedAt,
-                saveState: 'saved',
+                saveState: state.saveState === 'dirty' ? 'dirty' : 'saved',
             };
 
         case 'updateSegments':
@@ -800,6 +808,9 @@ export function composerReducer(
 
         case 'saveFailedOffline':
             return { ...state, saveState: 'offline' };
+
+        case 'saveFailed':
+            return { ...state, saveState: 'error' };
 
         case 'saveFailedStale':
             // A stale-write 409 whose server content is byte-identical to the

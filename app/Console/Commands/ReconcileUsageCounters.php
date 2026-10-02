@@ -8,15 +8,15 @@ use App\Models\UsageEvent;
 use App\Models\UsagePeriodCounter;
 use App\Support\InstanceSettings;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 
+#[Description('Recompute the open-period usage counters from raw succeeded usage events.')]
+#[Signature('usage:reconcile')]
 class ReconcileUsageCounters extends Command
 {
-    protected $signature = 'usage:reconcile';
-
-    protected $description = 'Recompute the open-period usage counters from raw succeeded usage events.';
-
     public function handle(InstanceSettings $settings): int
     {
         if (! $settings->usageTrackingEnabled()) {

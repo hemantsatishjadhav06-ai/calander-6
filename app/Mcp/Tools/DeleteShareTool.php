@@ -12,6 +12,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Revoke a share link for a post in the bound workspace.')]
 class DeleteShareTool extends WorkspaceTool
@@ -45,6 +46,7 @@ class DeleteShareTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

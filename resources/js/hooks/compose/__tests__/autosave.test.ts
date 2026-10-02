@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
+import { HttpNetworkError, HttpResponseError } from '@inertiajs/core';
 import { useHttp } from '@inertiajs/react';
-import { act, createElement } from 'react';
+import { act, createElement, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,7 +46,11 @@ const httpPut = vi.fn();
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
-let flushRef: (() => Promise<void>) | null = null;
+let flushRef: (() => Promise<boolean>) | null = null;
+let ensurePostRef: (() => Promise<string>) | null = null;
+let serverPostRef: (() => PostView | null) | null = null;
+let adoptServerPostRef: ((post: PostView) => void) | null = null;
+const dispatch = vi.fn();
 
 function draftState(overrides: Partial<ComposerState> = {}): ComposerState {
     return {
@@ -63,19 +68,25 @@ function Harness({
     state: ComposerState;
     onSaved: () => void;
 }) {
-    const { flush } = useAutosave({
+    const { flush, ensurePost, getServerPost, adoptServerPost } = useAutosave({
         state,
         accountIds: [],
-        dispatch: vi.fn(),
+        dispatch,
         onSaved,
     });
-    flushRef = flush;
+    useEffect(() => {
+        flushRef = flush;
+        ensurePostRef = ensurePost;
+        serverPostRef = getServerPost;
+        adoptServerPostRef = adoptServerPost;
+    }, [flush, ensurePost, getServerPost, adoptServerPost]);
 
     return null;
 }
 
 beforeEach(() => {
     transform.mockReset();
+    dispatch.mockReset();
     httpPost.mockReset().mockResolvedValue({ post });
     httpPut.mockReset().mockImplementation((_url, opts) => {
         opts?.onSuccess?.({ post });
@@ -97,7 +108,332 @@ afterEach(() => {
     root = null;
     container = null;
     flushRef = null;
+    ensurePostRef = null;
+    serverPostRef = null;
+    adoptServerPostRef = null;
     vi.clearAllMocks();
+});
+
+describe('autosave failure handling', () => {
+    it('makes the acknowledged post immediately available for revision-bound review requests', async () => {
+        await act(async () => {
+            root?.render(
+                createElement(Harness, {
+                    state: draftState(),
+                    onSaved: vi.fn(),
+                }),
+            );
+        });
+        await act(async () => {
+            expect(await flushRef?.()).toBe(true);
+            expect(serverPostRef?.()).toEqual(post);
+        });
+    });
+
+    it('adopts review responses into the synchronous server snapshot and composer baseline', async () => {
+        await act(async () => {
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({ postId: post.id, saveState: 'saved' }),
+                    onSaved: vi.fn(),
+                }),
+            );
+        });
+        const reviewed = { ...post, updated_at: '2026-10-02T10:00:00Z' };
+        act(() => adoptServerPostRef?.(reviewed));
+        expect(serverPostRef?.()).toEqual(reviewed);
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'syncServerPost',
+            post: reviewed,
+        });
+    });
+    it('waits for edits made during the forced save before allowing publishing to continue', async () => {
+        const finishSaves: (() => void)[] = [];
+        const payloads: {
+            segments: string[];
+            expected_updated_at: string | null;
+        }[] = [];
+        httpPut.mockImplementation((_url, opts) => {
+            payloads.push(transform.mock.calls.at(-1)?.[0]());
+
+            return new Promise<void>((resolve) => {
+                const updatedAt = `2026-07-17T10:00:0${finishSaves.length + 1}+00:00`;
+                finishSaves.push(() => {
+                    opts.onSuccess({
+                        post: { ...post, updated_at: updatedAt },
+                    });
+                    resolve();
+                });
+            });
+        });
+        const onSaved = vi.fn();
+        const publish = vi.fn();
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: post.id,
+                        baselineUpdatedAt: post.updated_at,
+                    }),
+                    onSaved,
+                }),
+            ),
+        );
+        let submission: Promise<void> | undefined;
+        await act(async () => {
+            submission = flushRef?.().then((saved) => {
+                if (saved) {
+                    publish();
+                }
+            });
+        });
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: post.id,
+                        baselineUpdatedAt: post.updated_at,
+                        segments: ['Typed while saving'],
+                    }),
+                    onSaved,
+                }),
+            ),
+        );
+        await act(async () => {
+            finishSaves[0]();
+        });
+
+        expect(httpPut).toHaveBeenCalledTimes(2);
+        expect(publish).not.toHaveBeenCalled();
+        expect(payloads[1]).toMatchObject({
+            segments: ['Typed while saving'],
+            expected_updated_at: '2026-07-17T10:00:01+00:00',
+        });
+
+        // Another edit during the follow-up request must be saved too.
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: post.id,
+                        baselineUpdatedAt: post.updated_at,
+                        segments: ['Latest revision'],
+                    }),
+                    onSaved,
+                }),
+            ),
+        );
+        await act(async () => {
+            finishSaves[1]();
+        });
+        expect(httpPut).toHaveBeenCalledTimes(3);
+        expect(publish).not.toHaveBeenCalled();
+        expect(payloads[2].segments).toEqual(['Latest revision']);
+
+        await act(async () => {
+            finishSaves[2]();
+            await submission;
+        });
+        expect(publish).toHaveBeenCalledOnce();
+    });
+
+    it('does not allow publishing when the save of late edits fails', async () => {
+        let finishFirstSave: (() => void) | undefined;
+        httpPut
+            .mockImplementationOnce(
+                (_url, opts) =>
+                    new Promise<void>((resolve) => {
+                        finishFirstSave = () => {
+                            opts.onSuccess({ post });
+                            resolve();
+                        };
+                    }),
+            )
+            .mockRejectedValueOnce(new HttpNetworkError('Offline'));
+        const onSaved = vi.fn();
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({ postId: post.id }),
+                    onSaved,
+                }),
+            ),
+        );
+        let submission: Promise<boolean> | undefined;
+        await act(async () => {
+            submission = flushRef?.();
+        });
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: post.id,
+                        segments: ['Late edit'],
+                    }),
+                    onSaved,
+                }),
+            ),
+        );
+        await act(async () => {
+            finishFirstSave?.();
+            expect(await submission).toBe(false);
+        });
+
+        expect(httpPut).toHaveBeenCalledTimes(2);
+        expect(dispatch).toHaveBeenCalledWith({ type: 'saveFailedOffline' });
+    });
+
+    it.each([422, 500])(
+        'reports a failed %s save and does not confirm persistence',
+        async (status) => {
+            httpPut.mockRejectedValue(
+                new HttpResponseError('Save failed', {
+                    status,
+                    data: JSON.stringify({
+                        errors: { segments: 'Invalid content' },
+                    }),
+                    headers: {},
+                }),
+            );
+            const onSaved = vi.fn();
+            act(() =>
+                root?.render(
+                    createElement(Harness, {
+                        state: draftState({ postId: post.id }),
+                        onSaved,
+                    }),
+                ),
+            );
+
+            await act(async () => {
+                expect(await flushRef?.()).toBe(false);
+            });
+
+            expect(dispatch).toHaveBeenCalledWith({ type: 'saveFailed' });
+            expect(onSaved).not.toHaveBeenCalled();
+        },
+    );
+
+    it('preserves a server conflict and prevents another save until it is resolved', async () => {
+        httpPut.mockRejectedValue(
+            new HttpResponseError('Conflict', {
+                status: 409,
+                data: JSON.stringify({ post }),
+                headers: {},
+            }),
+        );
+        const onSaved = vi.fn();
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({ postId: post.id }),
+                    onSaved,
+                }),
+            ),
+        );
+
+        await act(async () => expect(await flushRef?.()).toBe(false));
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'saveFailedStale',
+            post,
+        });
+
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: post.id,
+                        saveState: 'conflict',
+                        conflict: post,
+                    }),
+                    onSaved,
+                }),
+            ),
+        );
+        await act(async () => expect(await flushRef?.()).toBe(false));
+        expect(httpPut).toHaveBeenCalledOnce();
+    });
+
+    it('reports a network failure as unsaved and allows a later retry', async () => {
+        httpPut.mockRejectedValueOnce(new HttpNetworkError('Offline'));
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({ postId: post.id }),
+                    onSaved: vi.fn(),
+                }),
+            ),
+        );
+
+        await act(async () => expect(await flushRef?.()).toBe(false));
+        expect(dispatch).toHaveBeenCalledWith({ type: 'saveFailedOffline' });
+        await act(async () => expect(await flushRef?.()).toBe(true));
+        expect(httpPut).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not return a draft id when creation fails', async () => {
+        httpPost.mockRejectedValue(new Error('Save failed'));
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState(),
+                    onSaved: vi.fn(),
+                }),
+            ),
+        );
+
+        await act(async () => expect(await ensurePostRef?.()).toBe(''));
+        expect(dispatch).toHaveBeenCalledWith({ type: 'saveFailed' });
+    });
+
+    it('uses the latest edits when flushing behind an in-flight save', async () => {
+        let finishFirstSave: (() => void) | undefined;
+        httpPut.mockImplementationOnce(
+            (_url, opts) =>
+                new Promise<void>((resolve) => {
+                    finishFirstSave = () => {
+                        opts.onSuccess({ post });
+                        resolve();
+                    };
+                }),
+        );
+        const onSaved = vi.fn();
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({ postId: post.id }),
+                    onSaved,
+                }),
+            ),
+        );
+        let firstSave: Promise<boolean> | undefined;
+        let queuedSave: Promise<boolean> | undefined;
+        await act(async () => {
+            firstSave = flushRef?.();
+            await Promise.resolve();
+            queuedSave = flushRef?.();
+        });
+        act(() =>
+            root?.render(
+                createElement(Harness, {
+                    state: draftState({
+                        postId: post.id,
+                        segments: ['Latest content'],
+                    }),
+                    onSaved,
+                }),
+            ),
+        );
+        await act(async () => {
+            finishFirstSave?.();
+            await Promise.all([firstSave, queuedSave]);
+        });
+
+        expect(httpPut).toHaveBeenCalledTimes(2);
+        expect(transform.mock.calls.at(-1)?.[0]().segments).toEqual([
+            'Latest content',
+        ]);
+    });
 });
 
 describe('autosave debounce', () => {

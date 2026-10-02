@@ -20,7 +20,7 @@ test('successful publish notifies the author', function () {
     $target = PostTarget::factory()->for($post)->create(['status' => PostTargetStatus::Publishing]);
 
     // Drive onSuccess directly (the connector layer is exercised elsewhere).
-    (new PublishPostTarget($target))->notifyPublished($target);
+    new PublishPostTarget($target)->notifyPublished($target);
 
     Notification::assertSentTo($user, PostPublishedNotification::class);
 });
@@ -31,7 +31,7 @@ test('terminal non-auth failure notifies the author of publish failure', functio
     $post = Post::factory()->for($user, 'author')->create();
     $target = PostTarget::factory()->for($post)->create();
 
-    (new PublishPostTarget($target))->notifyFailed($target, ErrorKind::Unknown);
+    new PublishPostTarget($target)->notifyFailed($target, ErrorKind::Unknown);
 
     Notification::assertSentTo($user, PublishFailedNotification::class);
     Notification::assertNotSentTo($user, AccountNeedsAttentionNotification::class);
@@ -43,7 +43,7 @@ test('uncaught publish job failure notifies the author of publish failure', func
     $post = Post::factory()->for($user, 'author')->create();
     $target = PostTarget::factory()->for($post)->create(['status' => PostTargetStatus::Publishing]);
 
-    (new PublishPostTarget($target))->failed(new RuntimeException('Unexpected publisher crash'));
+    new PublishPostTarget($target)->failed(new RuntimeException('Unexpected publisher crash'));
 
     Notification::assertSentTo($user, PublishFailedNotification::class);
 });
@@ -54,7 +54,7 @@ test('terminal auth-expired failure notifies account-needs-attention instead', f
     $post = Post::factory()->for($user, 'author')->create();
     $target = PostTarget::factory()->for($post)->create();
 
-    (new PublishPostTarget($target))->notifyFailed($target, ErrorKind::AuthExpired);
+    new PublishPostTarget($target)->notifyFailed($target, ErrorKind::AuthExpired);
 
     Notification::assertSentTo($user, AccountNeedsAttentionNotification::class);
     Notification::assertNotSentTo($user, PublishFailedNotification::class);
@@ -66,7 +66,7 @@ test('published notification payload identifies the post, platform and account',
     $account = ConnectedAccount::factory()->create(['platform' => Platform::Bluesky->value, 'handle' => '@acme.bsky.social']);
     $target = PostTarget::factory()->for($post)->for($account, 'account')->create(['platform' => Platform::Bluesky->value]);
 
-    $payload = (new PostPublishedNotification($target))->toArray($user);
+    $payload = new PostPublishedNotification($target)->toArray($user);
 
     expect($payload['title'])->toBe('Published to Bluesky')
         ->and($payload['body'])->toContain('@acme.bsky.social')
@@ -80,7 +80,7 @@ test('failed notification payload identifies the post, platform and account', fu
     $account = ConnectedAccount::factory()->create(['platform' => Platform::X->value, 'handle' => '@acme']);
     $target = PostTarget::factory()->for($post)->for($account, 'account')->create(['platform' => Platform::X->value]);
 
-    $payload = (new PublishFailedNotification($target))->toArray($user);
+    $payload = new PublishFailedNotification($target)->toArray($user);
 
     expect($payload['title'])->toBe('Failed to publish to X')
         ->and($payload['body'])->toContain('@acme')
@@ -92,7 +92,7 @@ test('account needs attention notification links to accounts page', function () 
     $user = User::factory()->create();
     $account = ConnectedAccount::factory()->create(['platform' => Platform::X->value, 'handle' => '@acme']);
 
-    $payload = (new AccountNeedsAttentionNotification($account, 'ws-123'))->toArray($user);
+    $payload = new AccountNeedsAttentionNotification($account, 'ws-123')->toArray($user);
 
     expect($payload['title'])->toBe('X account needs attention')
         ->and($payload['body'])->toBe('@acme needs to be reconnected.')
@@ -104,7 +104,7 @@ test('payload excerpt falls back for media-only posts', function () {
     $post = Post::factory()->for($user, 'author')->create(['base_text' => '']);
     $target = PostTarget::factory()->for($post)->create();
 
-    $payload = (new PostPublishedNotification($target))->toArray($user);
+    $payload = new PostPublishedNotification($target)->toArray($user);
 
     expect($payload['body'])->toContain('Media post');
 });

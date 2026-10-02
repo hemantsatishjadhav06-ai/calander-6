@@ -16,8 +16,14 @@ test('fetches a valid mp4', function () {
 
     $result = app(SafeVideoFetcher::class)->fetch('https://example.com/clip.mp4');
 
-    expect($result['mime'])->toBe('video/mp4')
-        ->and($result['bytes'])->toStartWith("\x00\x00\x00\x20".'ftyp');
+    try {
+        expect($result['mime'])->toBe('video/mp4')
+            ->and($result['size'])->toBe(strlen(fakeMp4Bytes()))
+            ->and(file_get_contents($result['path']))->toStartWith("\x00\x00\x00\x20".'ftyp')
+            ->and($result)->not->toHaveKey('bytes');
+    } finally {
+        unlink($result['path']);
+    }
 });
 
 test('rejects a non-http scheme', function () {

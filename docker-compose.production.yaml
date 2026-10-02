@@ -1,5 +1,6 @@
-# Production deployment: pulls the prebuilt image from GHCR (no local build).
-# `pull_policy: always` makes `up` re-pull the latest published image. One
+# Production deployment: builds this repository's image. APP_IMAGE can name a
+# release image from this repository's GHCR package; use `up --no-build` with
+# that setting after pulling the image. One
 # container whose supervisord runs the Octane web server plus the queue worker,
 # scheduler, and (when toggled) SSR.
 #
@@ -16,9 +17,9 @@
 name: shoutrrr
 
 x-environment: &app-env
-    APP_ENV: "${APP_ENV:-production}"
+    APP_ENV: "production"
     APP_KEY: "${APP_KEY}"
-    APP_DEBUG: "${APP_DEBUG:-false}"
+    APP_DEBUG: "false"
     APP_URL: "${APP_URL:-http://localhost:8080}"
     OCTANE_SERVER: "frankenphp"
     # Force https on generated URLs (redirects, route()) when behind a
@@ -54,8 +55,10 @@ x-environment: &app-env
 
 services:
     app:
-        image: "ghcr.io/coollabsio/shoutrrr:latest"
-        pull_policy: always
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: "${APP_IMAGE:-calander-6:production}"
         restart: unless-stopped
         # Put any extra config in your .env (X_*, LINKEDIN_*, AWS_*,
         # OCTANE_HTTPS, ...) and it's passed straight through to the app.
@@ -69,9 +72,9 @@ services:
         volumes:
             - storage:/var/www/html/storage
             - sqlite:/var/www/html/database/sqlite
-        stop_grace_period: 60s
+        stop_grace_period: 16m
         healthcheck:
-            test: ["CMD", "healthcheck-octane"]
+            test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/up || exit 1"]
             start_period: 15s
             interval: 30s
             timeout: 10s

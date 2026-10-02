@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 function mimeOf(string $bytes): string
 {
-    return (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+    return new finfo(FILEINFO_MIME_TYPE)->buffer($bytes);
 }
 
 it('re-encodes a png to a real jpeg stored alongside the original', function () {
@@ -124,7 +124,7 @@ it('refuses to decode a canvas beyond the pixel ceiling', function () {
         'mime' => 'image/png',
     ]);
 
-    (new ImageToJpegConverter(maxPixels: 100))->convert($media);
+    new ImageToJpegConverter(maxPixels: 100)->convert($media);
 })->throws(ImageConversionFailed::class);
 
 it('the container-resolved converter honors a configured pixel ceiling', function () {

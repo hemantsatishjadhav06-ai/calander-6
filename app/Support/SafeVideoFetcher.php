@@ -20,10 +20,15 @@ class SafeVideoFetcher
 {
     use PinsCurlResolution;
 
-    public function __construct(private readonly HttpFactory $http) {}
+    public function __construct(
+        private readonly HttpFactory $http,
+        private readonly BoundedHttpDownload $download = new BoundedHttpDownload,
+    ) {}
 
     /**
-     * @return array{bytes: string, mime: string}
+     * The caller owns the returned temporary file and must unlink it.
+     *
+     * @return array{path: string, size: int, mime: string}
      *
      * @throws RuntimeException if the URL is blocked or the response is not an MP4.
      */
@@ -41,52 +46,39 @@ class SafeVideoFetcher
 
         $host = strtolower(trim($rawHost, '[]'));
         $ips = $this->resolveValidatedIps($host);
+        $ceiling = (int) config('media.max_video_bytes', Platform::maxVideoBytesCeiling());
 
         try {
-            $response = $this->http
+            $request = $this->http
                 ->timeout(20)
                 ->connectTimeout(5)
                 ->withOptions([
                     'allow_redirects' => false,
+                    'proxy' => '',
                     'curl' => $this->pinnedResolution($host, (string) $scheme, $url, $ips),
-                ])
-                ->get($url);
+                ]);
+            $download = $this->download->download($request, $url, $ceiling, 'Clip exceeds the maximum allowed video size.');
         } catch (ConnectionException) {
             throw new RuntimeException('Could not connect to the video host.');
         }
 
-        if (! $response->successful()) {
-            throw new RuntimeException('Could not download the clip (HTTP '.$response->status().').');
+        $source = fopen($download['path'], 'rb');
+        if ($source === false) {
+            @unlink($download['path']);
+            throw new RuntimeException('Could not read the downloaded clip.');
         }
 
-        $ceiling = (int) config('media.max_video_bytes', Platform::maxVideoBytesCeiling());
-
-        // Check the advertised length BEFORE materialising the body. body()
-        // buffers the whole response into a PHP string, so a clip larger than
-        // memory_limit would raise a fatal allocation error — which is not a
-        // RuntimeException, so the controllers' catch would miss it and the
-        // caller would get a bare 500 instead of a clean message.
-        $advertised = $response->header('Content-Length');
-
-        if ($advertised !== '' && (int) $advertised > $ceiling) {
-            throw new RuntimeException('Clip exceeds the maximum allowed video size.');
+        try {
+            $header = fread($source, 8);
+            if ($header === false || substr($header, 4, 4) !== 'ftyp') {
+                @unlink($download['path']);
+                throw new RuntimeException('The downloaded clip is not a valid MP4 video.');
+            }
+        } finally {
+            fclose($source);
         }
 
-        $bytes = $response->body();
-
-        // Still check the real length: Content-Length is optional, and a
-        // chunked response can omit or understate it.
-        if (strlen($bytes) > $ceiling) {
-            throw new RuntimeException('Clip exceeds the maximum allowed video size.');
-        }
-
-        // Same check PostVideoUploadController applies to direct-to-storage
-        // uploads: an ISO-BMFF `ftyp` box at offset 4.
-        if (substr($bytes, 4, 4) !== 'ftyp') {
-            throw new RuntimeException('The downloaded clip is not a valid MP4 video.');
-        }
-
-        return ['bytes' => $bytes, 'mime' => 'video/mp4'];
+        return [...$download, 'mime' => 'video/mp4'];
     }
 
     // --- SSRF helpers: copied verbatim from SafeImageFetcher, except
@@ -102,7 +94,8 @@ class SafeVideoFetcher
      */
     private function resolveValidatedIps(string $host): array
     {
-        if ($host === 'localhost' || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+        $canonicalHost = rtrim($host, '.');
+        if ($canonicalHost === 'localhost' || str_ends_with($canonicalHost, '.localhost') || str_ends_with($canonicalHost, '.local') || str_ends_with($canonicalHost, '.internal')) {
             throw new RuntimeException('That host is not allowed.');
         }
 
@@ -117,7 +110,7 @@ class SafeVideoFetcher
         }
 
         foreach ($ips as $ip) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE) === false) {
                 throw new RuntimeException('That host resolves to a private or reserved address.');
             }
         }

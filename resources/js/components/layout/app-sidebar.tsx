@@ -61,6 +61,8 @@ import { appVersion, githubReleaseUrl } from '@/lib/version';
 import { dashboard } from '@/routes';
 import { index as accountsRoute } from '@/routes/accounts';
 import { index as analyticsRoute } from '@/routes/analytics';
+import { index as blogsRoute } from '@/routes/blogs';
+import { index as brandsRoute } from '@/routes/brands';
 import { index as calendarRoute } from '@/routes/calendar';
 import { index as engagementRoute } from '@/routes/engagement';
 import { index as messagesRoute } from '@/routes/messages';
@@ -102,6 +104,8 @@ const postsNavItems: NavItem[] = [
         icon: ListChecks,
     },
     { title: 'Accounts', href: accountsRoute(), icon: Share2 },
+    { title: 'Brand setup', href: brandsRoute(), icon: Blocks },
+    { title: 'Blogs', href: blogsRoute(), icon: Pencil },
     { title: 'Engagement', href: engagementRoute(), icon: MessageCircle },
     { title: 'Messages', href: messagesRoute(), icon: MessageSquare },
 ];

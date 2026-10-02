@@ -115,7 +115,7 @@ test('postReply creates a nested comment on the post', function () {
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('urn:li:comment:(urn:li:share:123,999)');
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/comments')
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/comments')
         && $req['actor'] === 'urn:li:person:OWNER'
         && $req['object'] === 'urn:li:share:123'
         && $req['message']['text'] === 'thanks!'
@@ -186,7 +186,7 @@ test('postReply uses the org actor for a page account', function () {
     $result = linkedinConnector()->postReply(linkedinPageAccount(), $parent, 'thanks', ['access_token' => 't']);
 
     expect($result->isOk())->toBeTrue();
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/comments') && $req['actor'] === 'urn:li:organization:2414183');
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/comments') && $req['actor'] === 'urn:li:organization:2414183');
 });
 
 test('likeReply uses the org actor for a page account', function () {
@@ -196,7 +196,7 @@ test('likeReply uses the org actor for a page account', function () {
 
     linkedinConnector()->likeReply(linkedinPageAccount(), $reply, ['access_token' => 't']);
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/likes') && $req['actor'] === 'urn:li:organization:2414183');
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/likes') && $req['actor'] === 'urn:li:organization:2414183');
 });
 
 test('unlikeReply uses the org actor for a page account', function () {
@@ -207,8 +207,8 @@ test('unlikeReply uses the org actor for a page account', function () {
     linkedinConnector()->unlikeReply(linkedinPageAccount(), $reply, null, ['access_token' => 't']);
 
     // The actor is the trailing (rawurlencoded) segment of the DELETE URL path.
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/likes/')
-        && str_contains($req->url(), rawurlencode('urn:li:organization:2414183')));
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/likes/')
+        && str_contains((string) $req->url(), rawurlencode('urn:li:organization:2414183')));
 });
 
 test('deleteReply uses the org actor for a page account', function () {
@@ -221,5 +221,5 @@ test('deleteReply uses the org actor for a page account', function () {
 
     linkedinConnector()->deleteReply(linkedinPageAccount(), $reply, ['access_token' => 't']);
 
-    Http::assertSent(fn ($req) => str_contains($req->url(), '/comments/') && $req['actor'] === 'urn:li:organization:2414183');
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), '/comments/') && $req['actor'] === 'urn:li:organization:2414183');
 });

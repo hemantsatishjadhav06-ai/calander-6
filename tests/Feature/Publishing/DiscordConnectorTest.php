@@ -42,7 +42,7 @@ test('discord posts a single text message with wait=true and returns the message
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['m1']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'wait=true')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'wait=true')
         && $request['content'] === 'hello world');
 });
 
@@ -86,7 +86,7 @@ test('discord attaches media to the first segment as multipart with payload_json
     Http::assertSent(function ($request) {
         $body = $request->body();
 
-        return str_contains($request->url(), 'wait=true')
+        return str_contains((string) $request->url(), 'wait=true')
             && str_contains($body, 'name="payload_json"')
             && str_contains($body, 'name="files[0]"');
     });
@@ -149,6 +149,6 @@ test('discord delete removes each message best-effort', function () {
 
     app(DiscordPublishConnector::class)->delete($target, ['webhook_url' => DISCORD_HOOK]);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/messages/m1') && $request->method() === 'DELETE');
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/messages/m2') && $request->method() === 'DELETE');
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/messages/m1') && $request->method() === 'DELETE');
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/messages/m2') && $request->method() === 'DELETE');
 });

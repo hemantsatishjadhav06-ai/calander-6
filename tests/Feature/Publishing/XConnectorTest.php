@@ -461,6 +461,6 @@ test('x compresses oversized images via the compressor before upload', function 
 
     app(XConnector::class)->publish(xContext(['look'], [$media]));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'media/upload')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'media/upload')
         && str_contains((string) $request->body(), 'small-bytes'));
 });

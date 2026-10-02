@@ -16,19 +16,21 @@ use App\Http\Controllers\Posts\PostMediaContentController;
 use App\Http\Controllers\Posts\PostMediaController;
 use App\Http\Controllers\Posts\PostMetricsRefreshController;
 use App\Http\Controllers\Posts\PostQueueController;
+use App\Http\Controllers\Posts\PostReviewController;
 use App\Http\Controllers\Posts\PostScheduleController;
 use App\Http\Controllers\Posts\PostShareController;
 use App\Http\Controllers\Posts\PostTargetRetryController;
 use App\Http\Controllers\Posts\PostVideoUploadController;
 use App\Http\Controllers\Posts\PublishController;
+use App\Http\Middleware\LockPostContent;
 use App\Models\AccountSet;
 use App\Models\Post;
 use App\Models\PostShare;
 use App\Models\PostTarget;
 use Illuminate\Support\Facades\Route;
 
-// Route-model binding runs before WorkspaceMiddleware sets the Context, so scope
-// each lookup to the authed user's current workspace (a foreign id 404s).
+// WorkspaceMiddleware validates membership before route-model binding. Keep
+// each lookup explicitly bound to that user's workspace (a foreign id 404s).
 Route::bind('post', fn (string $value): Post => Post::query()
     ->where('workspace_id', request()->user()?->current_workspace_id)
     ->where('status', '!=', PostStatus::Deleted->value)
@@ -63,7 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('posts', [PostController::class, 'index'])->name('posts.index');
 
     Route::post('posts', [PostController::class, 'store'])->name('posts.store');
-    Route::put('posts/{post}', [PostController::class, 'update'])->name('posts.update');
+    Route::put('posts/{post}', [PostController::class, 'update'])->middleware(LockPostContent::class)->name('posts.update');
     Route::get('posts/{post}', [ComposerController::class, 'show'])->name('posts.show');
     Route::delete('posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
     // Throttled: each call copies every media file on the source post.
@@ -72,6 +74,11 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::put('posts/{post}/schedule', [PostScheduleController::class, 'update'])->name('posts.schedule');
     Route::post('posts/{post}/queue', [PostQueueController::class, 'store'])->name('posts.queue');
     Route::post('posts/{post}/publish', [PublishController::class, 'store'])->name('posts.publish');
+    Route::post('posts/{post}/review/request', [PostReviewController::class, 'requestReview'])->middleware('throttle:60,1')->name('posts.review.request');
+    Route::post('posts/{post}/review/approve', [PostReviewController::class, 'approve'])->middleware('throttle:60,1')->name('posts.review.approve');
+    Route::post('posts/{post}/review/reject', [PostReviewController::class, 'reject'])->middleware('throttle:60,1')->name('posts.review.reject');
+    Route::post('posts/{post}/review/revoke', [PostReviewController::class, 'revoke'])->middleware('throttle:60,1')->name('posts.review.revoke');
+    Route::put('posts/{post}/review/plan', [PostReviewController::class, 'plan'])->middleware('throttle:60,1')->name('posts.review.plan');
     Route::post('posts/{post}/targets/{target}/retry', [PostTargetRetryController::class, 'store'])->name('posts.targets.retry');
     // Bypasses the queued job's own per-platform rate limiting (dispatchSync runs
     // inline, skipping queue middleware), so throttle here — each hit is a real,
@@ -80,16 +87,16 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->middleware(['metrics.enabled', 'throttle:10,1'])->name('posts.metrics.refresh');
     // Media uploads are throttled to bound abuse (presigned-URL minting / storage flooding).
     Route::middleware('throttle:60,1')->group(function (): void {
-        Route::post('posts/{post}/media', [PostMediaController::class, 'store'])->name('posts.media.store');
-        Route::patch('posts/{post}/media/{media}/alt', [PostMediaController::class, 'updateAlt'])->name('posts.media.alt');
+        Route::post('posts/{post}/media', [PostMediaController::class, 'store'])->middleware(LockPostContent::class)->name('posts.media.store');
+        Route::patch('posts/{post}/media/{media}/alt', [PostMediaController::class, 'updateAlt'])->middleware(LockPostContent::class)->name('posts.media.alt');
         Route::post('posts/{post}/media/video-url', [PostVideoUploadController::class, 'url'])->name('posts.media.video-url');
-        Route::post('posts/{post}/media/video', [PostVideoUploadController::class, 'store'])->name('posts.media.video');
-        Route::post('posts/{post}/image-edit', [PostImageEditController::class, 'store'])->name('posts.image-edit.store');
-        Route::put('posts/{post}/image-edit/{media}', [PostImageEditController::class, 'update'])->name('posts.image-edit.update');
+        Route::post('posts/{post}/media/video', [PostVideoUploadController::class, 'store'])->middleware(LockPostContent::class)->name('posts.media.video');
+        Route::post('posts/{post}/image-edit', [PostImageEditController::class, 'store'])->middleware(LockPostContent::class)->name('posts.image-edit.store');
+        Route::put('posts/{post}/image-edit/{media}', [PostImageEditController::class, 'update'])->middleware(LockPostContent::class)->name('posts.image-edit.update');
         Route::post('posts/{post}/gifs', [PostGifController::class, 'store'])
-            ->middleware('gifs.enabled')->name('posts.gifs.store');
+            ->middleware(['gifs.enabled', LockPostContent::class])->name('posts.gifs.store');
     });
-    Route::delete('posts/{post}/media/{media}', [PostMediaController::class, 'destroy'])->name('posts.media.destroy');
+    Route::delete('posts/{post}/media/{media}', [PostMediaController::class, 'destroy'])->middleware(LockPostContent::class)->name('posts.media.destroy');
 
     // Same-origin proxy for editor fetches — the storage bucket serves display
     // URLs without CORS headers, which blocks the canvas-based image/video editors.

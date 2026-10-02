@@ -25,6 +25,7 @@ use App\Services\Publishing\Connectors\Concerns\MapsHttpErrors;
 use App\Services\Publishing\Contracts\PublishConnector;
 use App\Services\Repost\Contracts\RepostConnector;
 use App\Services\Usage\Concerns\TracksUsage;
+use App\Support\PublicHttpUrl;
 use App\Support\UsageOperation;
 use Closure;
 use GuzzleHttp\Psr7\Utils;
@@ -34,6 +35,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class BlueskyPublishConnector implements PublishConnector, RepostConnector
 {
@@ -48,6 +50,7 @@ class BlueskyPublishConnector implements PublishConnector, RepostConnector
         private readonly ImageCompressor $imageCompressor,
         private readonly DPoP $dpop,
         private readonly GifToMp4Converter $gifToMp4Converter,
+        private readonly PublicHttpUrl $urls,
     ) {}
 
     public function publish(PublishContext $context): PublishResult
@@ -496,7 +499,7 @@ class BlueskyPublishConnector implements PublishConnector, RepostConnector
      */
     private function videoEmbed(PublishContext $context, PostMedia $media, ?string $presentation = null): array
     {
-        $blob = (new MediaUploadState($context->target->media_upload_state))->blob($media->id);
+        $blob = new MediaUploadState($context->target->media_upload_state)->blob($media->id);
 
         $embed = ['$type' => 'app.bsky.embed.video', 'video' => $blob];
 
@@ -633,15 +636,16 @@ class BlueskyPublishConnector implements PublishConnector, RepostConnector
     private function authorized(string $method, string $url, string $jwt, array $session, ?string $nonce = null): PendingRequest
     {
         $key = $session['dpop_private_jwk'] ?? null;
+        $request = $this->http->withOptions($this->urls->options($url))->timeout(30)->connectTimeout(5);
 
         if (is_array($key)) {
-            return $this->http->withHeaders([
+            return $request->withHeaders([
                 'Authorization' => 'DPoP '.$jwt,
                 'DPoP' => $this->dpop->proof($method, $url, $key, $jwt, $nonce ?? $session['dpop_nonce'] ?? null),
             ]);
         }
 
-        return $this->http->withToken($jwt);
+        return $request->withToken($jwt);
     }
 
     /**
@@ -750,7 +754,7 @@ class BlueskyPublishConnector implements PublishConnector, RepostConnector
  *
  * @internal
  */
-final class BlueskyRequestFailed extends \RuntimeException
+final class BlueskyRequestFailed extends RuntimeException
 {
     public function __construct(public readonly Response $response)
     {
@@ -763,4 +767,4 @@ final class BlueskyRequestFailed extends \RuntimeException
  *
  * @internal
  */
-final class BlueskyValidationFailed extends \RuntimeException {}
+final class BlueskyValidationFailed extends RuntimeException {}

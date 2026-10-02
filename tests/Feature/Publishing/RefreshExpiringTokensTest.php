@@ -5,8 +5,14 @@ use App\Enums\Platform;
 use App\Models\ConnectedAccount;
 use App\Models\ConnectedAccountSecret;
 use App\Services\Atproto\DPoP;
+use App\Support\PublicHttpUrl;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 test('it proactively refreshes accounts expiring within six hours', function () {
     $account = ConnectedAccount::factory()->create([

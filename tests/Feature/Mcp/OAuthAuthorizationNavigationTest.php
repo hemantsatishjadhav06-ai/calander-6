@@ -16,7 +16,7 @@ test('an Inertia OAuth authorization request becomes a full page navigation', fu
         ->assertStatus(409)
         ->assertHeader('X-Inertia-Location');
 
-    parse_str((string) parse_url($response->headers->get('X-Inertia-Location'), PHP_URL_QUERY), $query);
+    parse_str((string) parse_url((string) $response->headers->get('X-Inertia-Location'), PHP_URL_QUERY), $query);
 
     expect($response->headers->get('X-Inertia-Location'))->toStartWith(url('/oauth/authorize').'?')
         ->and($query)->toBe([

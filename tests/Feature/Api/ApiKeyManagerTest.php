@@ -78,7 +78,7 @@ test('a custom expiry is stored on the key', function () {
 test('last_four matches the last 4 characters of the plaintext token', function () {
     [$apiKey, $plain] = $this->manager->issue($this->workspace, $this->user, 'CI bot', 'write', null);
 
-    expect($apiKey->last_four)->toBe(substr($plain, -4));
+    expect($apiKey->last_four)->toBe(substr((string) $plain, -4));
 });
 
 test('a key issued with a custom expiry produces a Passport token expiring at that instant', function () {

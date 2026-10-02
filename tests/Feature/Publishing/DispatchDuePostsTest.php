@@ -6,6 +6,7 @@ use App\Enums\PostTargetStatus;
 use App\Jobs\PublishPostTarget;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Services\Publishing\PublishDispatcher;
 use Illuminate\Support\Facades\Bus;
 
 test('it claims due scheduled posts and dispatches their targets', function () {
@@ -101,4 +102,22 @@ test('a second run does not double-dispatch an already-publishing post', functio
     $this->artisan('posts:dispatch-due')->assertExitCode(0);
 
     Bus::assertNotDispatched(PublishPostTarget::class);
+});
+
+test('a failed queue dispatch rolls back the scheduled claim and any partially queued targets', function () {
+    config(['queue.default' => 'database']);
+    $post = Post::factory()->create(['status' => PostStatus::Scheduled, 'scheduled_at' => now()->subMinute()]);
+    PostTarget::factory()->for($post)->create();
+    $dispatcher = Mockery::mock(PublishDispatcher::class);
+    $dispatcher->shouldReceive('dispatchForPost')->once()->andReturnUsing(function (Post $claimed): never {
+        PublishPostTarget::dispatch($claimed->targets()->firstOrFail());
+
+        throw new RuntimeException('queue dispatch interrupted');
+    });
+    app()->instance(PublishDispatcher::class, $dispatcher);
+
+    expect(fn () => $this->artisan('posts:dispatch-due')->run())->toThrow(RuntimeException::class, 'queue dispatch interrupted');
+
+    expect($post->refresh()->status)->toBe(PostStatus::Scheduled);
+    $this->assertDatabaseCount('jobs', 0);
 });

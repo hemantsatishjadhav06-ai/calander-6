@@ -1,8 +1,20 @@
 <?php
 
 use App\Enums\Platform;
+use App\Enums\WorkspaceRole;
 use App\Http\Controllers\ConnectedAccounts\OAuthConnectionController;
+use App\Jobs\FetchAccountMessages;
 use App\Models\ConnectedAccount;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMembership;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+
+beforeEach(function (): void {
+    Queue::fake([FetchAccountMessages::class]);
+    Http::fake(['https://api.x.com/2/users/me*' => Http::response(['data' => []])]);
+});
 
 // ownerActingIn() + fakeOAuthUser() are shared helpers defined in tests/Pest.php.
 
@@ -35,7 +47,7 @@ test('x callback records dm_enabled true when the dm scopes are granted', functi
         'approvedScopes' => ['users.read', 'tweet.read', 'dm.read', 'dm.write'],
     ]);
 
-    test()->get('/accounts/callback/x')->assertRedirect(route('accounts.index'));
+    test()->get('/accounts/callback/x?state=test-oauth-state')->assertRedirect(route('accounts.index'));
 
     $account = ConnectedAccount::withoutGlobalScopes()->firstWhere('remote_account_id', 'x-dm-yes');
     expect($account->capabilities['dm_enabled'])->toBeTrue()
@@ -55,7 +67,7 @@ test('x callback records dm_enabled false when the dm scopes are not granted', f
         'approvedScopes' => ['users.read', 'tweet.read'],
     ]);
 
-    test()->get('/accounts/callback/x')->assertRedirect(route('accounts.index'));
+    test()->get('/accounts/callback/x?state=test-oauth-state')->assertRedirect(route('accounts.index'));
 
     $account = ConnectedAccount::withoutGlobalScopes()->firstWhere('remote_account_id', 'x-dm-no');
     expect($account->capabilities['dm_enabled'])->toBeFalse()
@@ -74,13 +86,13 @@ test('x callback keeps the dm capability alongside the existing tier capabilitie
         'token' => 'access',
         'approvedScopes' => ['users.read', 'tweet.read', 'dm.read', 'dm.write'],
     ]);
-    Illuminate\Support\Facades\Http::fake([
-        'https://api.x.com/2/users/me*' => Illuminate\Support\Facades\Http::response([
+    Http::fake([
+        'https://api.x.com/2/users/me*' => Http::response([
             'data' => ['id' => 'x-dm-merge', 'subscription_type' => 'None', 'verified_type' => 'none'],
         ]),
     ]);
 
-    test()->get('/accounts/callback/x')->assertRedirect(route('accounts.index'));
+    test()->get('/accounts/callback/x?state=test-oauth-state')->assertRedirect(route('accounts.index'));
 
     $account = ConnectedAccount::withoutGlobalScopes()->firstWhere('remote_account_id', 'x-dm-merge');
     expect($account->capabilities)->toMatchArray([
@@ -90,24 +102,24 @@ test('x callback keeps the dm capability alongside the existing tier capabilitie
 });
 
 test('bluesky connect records dm_enabled from the dm_access checkbox', function () {
-    $user = App\Models\User::factory()->create();
-    $workspace = App\Models\Workspace::factory()->create(['owner_id' => $user->id]);
-    App\Models\WorkspaceMembership::factory()->create([
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create(['owner_id' => $user->id]);
+    WorkspaceMembership::factory()->create([
         'workspace_id' => $workspace->id,
         'user_id' => $user->id,
-        'role' => App\Enums\WorkspaceRole::Owner,
+        'role' => WorkspaceRole::Owner,
     ]);
     $user->forceFill(['current_workspace_id' => $workspace->id])->save();
     test()->actingAs($user);
 
-    Illuminate\Support\Facades\Http::fake([
-        '*xrpc/com.atproto.server.createSession' => Illuminate\Support\Facades\Http::response([
+    Http::fake([
+        '*xrpc/com.atproto.server.createSession' => Http::response([
             'did' => 'did:plc:dm',
             'handle' => 'dm.bsky.social',
             'accessJwt' => 'access-jwt',
             'refreshJwt' => 'refresh-jwt',
         ]),
-        '*xrpc/app.bsky.actor.getProfile*' => Illuminate\Support\Facades\Http::response([
+        '*xrpc/app.bsky.actor.getProfile*' => Http::response([
             'did' => 'did:plc:dm',
             'handle' => 'dm.bsky.social',
         ]),
@@ -125,24 +137,24 @@ test('bluesky connect records dm_enabled from the dm_access checkbox', function 
 });
 
 test('bluesky connect defaults dm_enabled to false without the checkbox', function () {
-    $user = App\Models\User::factory()->create();
-    $workspace = App\Models\Workspace::factory()->create(['owner_id' => $user->id]);
-    App\Models\WorkspaceMembership::factory()->create([
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create(['owner_id' => $user->id]);
+    WorkspaceMembership::factory()->create([
         'workspace_id' => $workspace->id,
         'user_id' => $user->id,
-        'role' => App\Enums\WorkspaceRole::Owner,
+        'role' => WorkspaceRole::Owner,
     ]);
     $user->forceFill(['current_workspace_id' => $workspace->id])->save();
     test()->actingAs($user);
 
-    Illuminate\Support\Facades\Http::fake([
-        '*xrpc/com.atproto.server.createSession' => Illuminate\Support\Facades\Http::response([
+    Http::fake([
+        '*xrpc/com.atproto.server.createSession' => Http::response([
             'did' => 'did:plc:nodm',
             'handle' => 'nodm.bsky.social',
             'accessJwt' => 'access-jwt',
             'refreshJwt' => 'refresh-jwt',
         ]),
-        '*xrpc/app.bsky.actor.getProfile*' => Illuminate\Support\Facades\Http::response([
+        '*xrpc/app.bsky.actor.getProfile*' => Http::response([
             'did' => 'did:plc:nodm',
             'handle' => 'nodm.bsky.social',
         ]),

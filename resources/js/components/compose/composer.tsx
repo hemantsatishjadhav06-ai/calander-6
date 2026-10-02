@@ -46,6 +46,7 @@ import {
     normalizeSettings,
     type EditSettings,
 } from '@/lib/image-editor/settings';
+import { intendedSchedule } from '@/lib/posts/approval';
 import { postCapabilities } from '@/lib/posts/capabilities';
 import { cn } from '@/lib/utils';
 import { index as accountsRoute } from '@/routes/accounts';
@@ -71,6 +72,7 @@ import EditorBody, { type EditorBodyHandle } from './editor-body';
 import { ImageEditor } from './image-editor';
 import { PlatformPreviewPanel } from './platform-preview-panel';
 import PlatformTabs from './platform-tabs';
+import { PostApprovalPanel } from './post-approval-panel';
 import SaveIndicator from './save-indicator';
 import { ScheduleTray } from './schedule-tray';
 import { SegmentMediaRow } from './segment-media-row';
@@ -188,7 +190,12 @@ export default function Composer({
 }: ComposerProps) {
     const schedulingTz = useSchedulingTimezone();
     const confirm = useConfirm();
-    const { shell } = usePage().props;
+    const { shell, workspaces } = usePage().props;
+    const approvalRequired = Boolean(workspaces?.current?.approval_required);
+    const [savedPost, setSavedPost] = useState(post);
+    useEffect(() => {
+        setSavedPost(post);
+    }, [post]);
     const saveMentionHttp = useHttp<
         Record<string, never>,
         { mention: WorkspaceMention }
@@ -244,11 +251,13 @@ export default function Composer({
         REPOST_CAPABLE_PLATFORMS.has(account.platform),
     );
     const selectedVideoLimits = videoLimitsForTargets(limits, tabAccounts);
-    const { flush, ensurePost } = useAutosave({
+    const { flush, ensurePost, getServerPost, adoptServerPost } = useAutosave({
         state,
         accountIds: destinationAccountIds,
         dispatch,
         onSaved,
+        initialPost: post,
+        onServerPost: setSavedPost,
     });
     const publishStatus = usePublishStatus({ pagePost: post });
 
@@ -364,16 +373,25 @@ export default function Composer({
             return false;
         }
 
-        return (
-            window.localStorage.getItem(PREVIEW_PINNED_STORAGE_KEY) === 'true'
-        );
+        try {
+            return (
+                window.localStorage.getItem(PREVIEW_PINNED_STORAGE_KEY) ===
+                'true'
+            );
+        } catch {
+            return false;
+        }
     });
     const previewVisible = showPreview || previewPinned;
     useEffect(() => {
-        window.localStorage.setItem(
-            PREVIEW_PINNED_STORAGE_KEY,
-            String(previewPinned),
-        );
+        try {
+            window.localStorage.setItem(
+                PREVIEW_PINNED_STORAGE_KEY,
+                String(previewPinned),
+            );
+        } catch {
+            // Keep preview controls usable when browser storage is blocked.
+        }
     }, [previewPinned]);
     // Revoke any outstanding batch object URLs if the composer unmounts mid-batch.
     const editingRef = useRef<Editing | null>(null);
@@ -1045,6 +1063,9 @@ export default function Composer({
     const activeNotices = activeAccount
         ? (notices.find((n) => n.accountId === activeAccount.id)?.notices ?? [])
         : [];
+    const unsavedChanges =
+        state.saveState !== 'saved' && state.saveState !== 'idle';
+    const plannedAt = intendedSchedule(state.scheduleTray, queueState.slot);
 
     return (
         <div
@@ -1056,6 +1077,19 @@ export default function Composer({
             )}
         >
             <div className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-[box-shadow,border-color] duration-300 focus-within:border-primary/25 focus-within:shadow-[0_0_16px_-6px_color-mix(in_oklch,var(--primary)_28%,transparent)]">
+                {!readOnly && (
+                    <PostApprovalPanel
+                        post={savedPost}
+                        required={approvalRequired}
+                        unsavedChanges={unsavedChanges}
+                        plannedAt={plannedAt}
+                        accounts={accounts}
+                        limits={limits}
+                        onSaveDraft={flush}
+                        onGetServerPost={getServerPost}
+                        onServerPost={adoptServerPost}
+                    />
+                )}
                 {/* Tab-strip row */}
                 <div className="flex flex-wrap items-center gap-y-2 border-b border-border px-2 py-2 md:flex-nowrap md:gap-y-0">
                     {/* Tabs hang to the bottom border (underline meets it) via a
@@ -1537,6 +1571,12 @@ export default function Composer({
                             onServerPost={publishStatus.applyServerPost}
                             blockedAccounts={blockedAccounts}
                             limits={limits}
+                            approvalRequired={approvalRequired}
+                            approval={savedPost?.approval}
+                            unsavedChanges={unsavedChanges}
+                            queueSlot={queueState.slot}
+                            onGetServerPost={getServerPost}
+                            onReviewPost={adoptServerPost}
                         />
                     </div>
                 )}

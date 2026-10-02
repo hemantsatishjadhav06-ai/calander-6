@@ -129,13 +129,7 @@ class GifAttacher
     {
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
 
-        foreach (self::ALLOWED_HOST_SUFFIXES as $suffix) {
-            if ($host === $suffix || str_ends_with($host, '.'.$suffix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(self::ALLOWED_HOST_SUFFIXES, fn ($suffix) => $host === $suffix || str_ends_with($host, '.'.$suffix));
     }
 
     /**
@@ -192,33 +186,8 @@ class GifAttacher
     ): PostMedia {
         $clip = $this->video->fetch($variant['url']);
 
-        // A temp file is only needed to run ffprobe, so it is skipped when a
-        // duration was supplied. Today nothing supplies one: Klipy's browse
-        // response carries no duration field, so $durationSeconds is always
-        // null and every clip attach shells out to ffprobe. That makes ffmpeg
-        // a hard requirement for the Clips catalog — see attach()'s guard.
-        $temp = null;
-
         try {
-            $duration = $durationSeconds;
-
-            if ($duration === null) {
-                $temp = tempnam(sys_get_temp_dir(), 'klipy');
-
-                if ($temp === false) {
-                    // Reset to null (rather than leaving the failed false value)
-                    // so the finally block below — whose $temp !== null check is
-                    // the only thing guarding the unlink() call — doesn't try to
-                    // unlink a nonexistent path.
-                    $temp = null;
-
-                    throw new RuntimeException('Could not attach that clip.');
-                }
-
-                file_put_contents($temp, $clip['bytes']);
-
-                $duration = $this->probeDuration($temp);
-            }
+            $duration = $durationSeconds ?? $this->probeDuration($clip['path']);
 
             if ($duration === null || $duration < 1) {
                 throw new RuntimeException('That clip has no readable duration, so it cannot be attached.');
@@ -226,7 +195,18 @@ class GifAttacher
 
             $disk = FileStorage::diskName();
             $path = 'media/'.$workspaceId.'/'.Str::uuid()->toString().'.mp4';
-            FileStorage::disk($disk)->put($path, $clip['bytes']);
+            $source = fopen($clip['path'], 'rb');
+            if ($source === false) {
+                throw new RuntimeException('Could not read that clip.');
+            }
+
+            try {
+                if (! FileStorage::disk($disk)->put($path, $source)) {
+                    throw new RuntimeException('Could not store that clip.');
+                }
+            } finally {
+                fclose($source);
+            }
 
             return PostMedia::create([
                 'workspace_id' => $workspaceId,
@@ -235,7 +215,7 @@ class GifAttacher
                 'path' => $path,
                 'kind' => 'video',
                 'mime' => 'video/mp4',
-                'size_bytes' => strlen($clip['bytes']),
+                'size_bytes' => $clip['size'],
                 'width' => $variant['width'],
                 'height' => $variant['height'],
                 'duration_seconds' => $duration,
@@ -243,9 +223,7 @@ class GifAttacher
                 'position' => 0,
             ]);
         } finally {
-            if ($temp !== null) {
-                @unlink($temp);
-            }
+            @unlink($clip['path']);
         }
     }
 

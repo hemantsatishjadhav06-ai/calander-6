@@ -74,3 +74,5 @@ require __DIR__.'/posts.php';
 require __DIR__.'/engagement.php';
 require __DIR__.'/messaging.php';
 require __DIR__.'/feedback.php';
+require __DIR__.'/brands.php';
+require __DIR__.'/blogs.php';

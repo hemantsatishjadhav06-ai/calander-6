@@ -6,15 +6,15 @@ namespace App\Console\Commands;
 
 use App\Models\UsageEvent;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 
+#[Description('Delete usage events older than the configured retention window.')]
+#[Signature('usage:prune')]
 class PruneUsageEvents extends Command
 {
-    protected $signature = 'usage:prune';
-
-    protected $description = 'Delete usage events older than the configured retention window.';
-
     public function handle(): int
     {
         $days = (int) config('usage.retention_days', 180);

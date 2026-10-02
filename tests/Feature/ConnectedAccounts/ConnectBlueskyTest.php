@@ -7,7 +7,13 @@ use App\Models\ConnectedAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
+use App\Support\PublicHttpUrl;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 function blueskyOwner(): array
 {
@@ -71,7 +77,7 @@ test('a leading at sign is removed from the submitted bluesky handle', function 
         'pds_url' => 'https://bsky.social',
     ])->assertRedirect(route('accounts.index'));
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'com.atproto.server.createSession')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), 'com.atproto.server.createSession')
         && $request['identifier'] === 'ada.bsky.social');
 });
 

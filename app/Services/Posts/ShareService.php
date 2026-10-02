@@ -17,6 +17,7 @@ class ShareService
      */
     public function mint(Post $post, User $user, ?CarbonInterface $expiresAt): array
     {
+        app(PostApprovalService::class)->assertApproved($post);
         $token = Str::random(43);
         $share = PostShare::query()->create([
             'post_id' => $post->id,

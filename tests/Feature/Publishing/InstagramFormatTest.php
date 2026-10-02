@@ -52,7 +52,7 @@ test('a story container sends media_type STORIES and no caption', function () {
     expect($result->isSuccessful())->toBeTrue();
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), '/ig123/media') || str_contains($request->url(), 'media_publish')) {
+        if (! str_contains((string) $request->url(), '/ig123/media') || str_contains((string) $request->url(), 'media_publish')) {
             return false;
         }
 
@@ -81,7 +81,7 @@ test('a reels container keeps the caption and sends media_type REELS', function 
     expect($result->isSuccessful())->toBeTrue();
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), '/ig123/media') || str_contains($request->url(), 'media_publish')) {
+        if (! str_contains((string) $request->url(), '/ig123/media') || str_contains((string) $request->url(), 'media_publish')) {
             return false;
         }
 

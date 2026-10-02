@@ -3,6 +3,7 @@
 use App\Dto\Publishing\PublishContext;
 use App\Enums\Platform;
 use App\Enums\WorkspaceRole;
+use App\Jobs\FetchAccountMessages;
 use App\Models\ConnectedAccount;
 use App\Models\PostTarget;
 use App\Models\User;
@@ -10,6 +11,11 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use App\Services\Publishing\PublishConnectorRegistry;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+
+beforeEach(function (): void {
+    Queue::fake([FetchAccountMessages::class]);
+});
 
 /**
  * The positive path deferred from Task 2's ConnectMetaTest guard tests: with
@@ -38,6 +44,7 @@ test('posting a stashed page selection creates a facebook connected account and 
     expect(Platform::launchedMetaGraphPlatforms())->toBe([Platform::Facebook, Platform::Instagram]);
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [
             'PAGE1' => [
                 'pageId' => 'PAGE1',
@@ -96,6 +103,6 @@ test('the freshly connected facebook page can publish through the registered con
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['page123_555']);
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/page123/feed')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/page123/feed')
         && $request['message'] === 'hello from the launched facebook connector');
 });

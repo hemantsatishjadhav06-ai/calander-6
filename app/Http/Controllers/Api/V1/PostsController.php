@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Dto\Post\DraftData;
-use App\Enums\PostStatus;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesWorkspacePost;
 use App\Http\Controllers\Controller;
-use App\Jobs\DeletePostTarget;
 use App\Models\Post;
-use App\Models\PostTarget;
 use App\Models\User;
 use App\Services\Posts\DraftService;
+use App\Services\Posts\PostDeletionService;
 use App\Services\Posts\PostStaleWriteException;
 use App\Support\CursorPage;
 use App\Support\PostListItem;
@@ -135,26 +133,16 @@ class PostsController extends Controller
         return response()->json(['post' => PostView::make($updated->fresh(['targets.account', 'media']))]);
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(string $id, PostDeletionService $deletion): JsonResponse
     {
         $model = $this->findPostOrFail($id);
         $this->authorize('delete', $model);
 
-        $hadBeenPublished = in_array($model->status, [PostStatus::Published, PostStatus::Partial, PostStatus::Failed], true);
-
-        $model->loadMissing('targets');
+        $hadBeenPublished = $deletion->delete($model);
 
         if (! $hadBeenPublished) {
-            $model->delete();
-
             return response()->json(['deleted' => true, 'remote' => false]);
         }
-
-        $model->targets
-            ->filter(fn (PostTarget $t): bool => $t->remote_id !== null)
-            ->each(fn (PostTarget $t) => DeletePostTarget::dispatch($t));
-
-        $model->forceFill(['status' => PostStatus::Deleted->value, 'deleted_at' => now()])->save();
 
         return response()->json(['deleted' => true, 'remote' => true, 'message' => 'Remote deletion queued for published targets.']);
     }

@@ -12,6 +12,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('List active (non-revoked, non-expired) share links for a post in the bound workspace.')]
 class ListSharesTool extends WorkspaceTool
@@ -48,6 +49,7 @@ class ListSharesTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

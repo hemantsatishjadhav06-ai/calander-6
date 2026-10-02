@@ -43,7 +43,7 @@ class DiscordPublishConnector implements PublishConnector
         }
 
         $segments = array_values(array_filter(
-            array_map(static fn (string $segment): string => trim($segment), $context->segments),
+            array_map(trim(...), $context->segments),
             static fn (string $segment): bool => $segment !== '',
         ));
 

@@ -25,6 +25,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class XConnector implements PublishConnector, RepostConnector
 {
@@ -481,13 +482,7 @@ class XConnector implements PublishConnector, RepostConnector
             return true;
         }
 
-        foreach ($haystacks as $haystack) {
-            if (mb_stripos($haystack, 'duplicate') !== false) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($haystacks, fn ($haystack) => mb_stripos((string) $haystack, 'duplicate') !== false);
     }
 }
 
@@ -497,7 +492,7 @@ class XConnector implements PublishConnector, RepostConnector
  *
  * @internal
  */
-final class XRequestFailed extends \RuntimeException
+final class XRequestFailed extends RuntimeException
 {
     public function __construct(public readonly Response $response)
     {

@@ -223,7 +223,7 @@ test('a user with no membership in the current workspace cannot reach billing', 
 
     $this->actingAs($user)
         ->get(route('billing.index'))
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
 test('admins may manage billing', function () {

@@ -33,9 +33,9 @@ test('does not dispatch when the share trigger is disabled', function () {
 test('posts the share to klipy when it runs', function () {
     Http::fake(['https://api.klipy.com/*' => Http::response(['result' => true])]);
 
-    (new TriggerKlipyShare('gif', 'happy-dance-991', 'cust-abc'))->handle(app(KlipyClient::class));
+    new TriggerKlipyShare('gif', 'happy-dance-991', 'cust-abc')->handle(app(KlipyClient::class));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/test-key/gifs/share')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/test-key/gifs/share')
         && $request['slug'] === 'happy-dance-991'
         && $request['customer_id'] === 'cust-abc');
 });
@@ -43,7 +43,7 @@ test('posts the share to klipy when it runs', function () {
 test('still completes without throwing on an http failure response, since share() has no status check', function () {
     Http::fake(['https://api.klipy.com/*' => Http::response('nope', 500)]);
 
-    expect(fn () => (new TriggerKlipyShare('gif', 'x', 'cust-abc'))->handle(app(KlipyClient::class)))
+    expect(fn () => new TriggerKlipyShare('gif', 'x', 'cust-abc')->handle(app(KlipyClient::class)))
         ->not->toThrow(Exception::class);
 });
 
@@ -54,7 +54,7 @@ test('swallows a klipy failure so a retry storm never follows an attach', functi
     // and throws: pathFor() raises InvalidArgumentException before any HTTP call is
     // made. This genuinely exercises handle()'s try/catch, unlike an HTTP failure
     // (share() never checks the response status).
-    expect(fn () => (new TriggerKlipyShare('memes', 'x', 'cust-abc'))->handle(app(KlipyClient::class)))
+    expect(fn () => new TriggerKlipyShare('memes', 'x', 'cust-abc')->handle(app(KlipyClient::class)))
         ->not->toThrow(Throwable::class);
 
     Log::shouldHaveReceived('info')
@@ -69,7 +69,7 @@ test('never logs the api key even if a connection failure message embeds it', fu
         'cURL error 6: Could not resolve host: api.klipy.com (see https://api.klipy.com/api/v1/test-key/gifs/share)'
     ));
 
-    (new TriggerKlipyShare('gif', 'happy-dance-991', 'cust-abc'))->handle(app(KlipyClient::class));
+    new TriggerKlipyShare('gif', 'happy-dance-991', 'cust-abc')->handle(app(KlipyClient::class));
 
     // KlipyClient::share() swallows ConnectionException itself, so today this never
     // reaches handle()'s Log::info call at all. That's the invariant this test pins:

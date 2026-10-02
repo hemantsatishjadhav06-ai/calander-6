@@ -5,6 +5,7 @@
 # ============================================================
 # https://hub.docker.com/r/serversideup/php/tags?name=frankenphp
 ARG SERVERSIDEUP_PHP_VERSION=8.5-frankenphp-trixie
+ARG BUN_VERSION=1.4.2
 # https://www.postgresql.org/support/versioning/
 ARG POSTGRES_VERSION=17
 ARG USER_ID=9999
@@ -75,7 +76,7 @@ USER www-data
 # SSR bundle are arch-independent, and this avoids running Bun/Vite under QEMU
 # emulation. node_modules native deps here (oxide/lightningcss/rolldown) are
 # build-time only; the SSR runtime bundle loads pure-JS deps.
-FROM --platform=$BUILDPLATFORM oven/bun:latest AS assets
+FROM --platform=$BUILDPLATFORM oven/bun:${BUN_VERSION} AS assets
 
 WORKDIR /app
 COPY package.json bun.lock vite.config.ts ./
@@ -97,6 +98,11 @@ ARG APP_VERSION
 ENV APP_VERSION=${APP_VERSION}
 # Builds client assets AND the SSR bundle (bootstrap/ssr/ssr.mjs)
 RUN bun run build:ssr
+
+# ============================================================
+# Stage: bun-runtime — Bun for the target architecture
+# ============================================================
+FROM oven/bun:${BUN_VERSION} AS bun-runtime
 
 # ============================================================
 # Stage: app — production image (single container, supervised)
@@ -137,20 +143,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         supervisor \
     && rm -rf /var/lib/apt/lists/*
-# Install the Bun binary for the target architecture (amd64 -> x64, arm64 -> aarch64).
-# TARGETARCH is provided automatically by buildx.
-ARG TARGETARCH
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-        amd64) bun_arch=x64 ;; \
-        arm64) bun_arch=aarch64 ;; \
-        *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSL "https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${bun_arch}.zip" -o /tmp/bun.zip; \
-    unzip /tmp/bun.zip -d /tmp; \
-    mv "/tmp/bun-linux-${bun_arch}/bun" /usr/local/bin/bun; \
-    chmod 755 /usr/local/bin/bun; \
-    rm -rf /tmp/bun.zip "/tmp/bun-linux-${bun_arch}"
+# Use the same pinned Bun release at build time and runtime. The image stage
+# supplies the target architecture without fetching an unpinned release zip.
+COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
 
 # serversideup runtime configuration knobs
 ARG AUTORUN_ENABLED=true
@@ -196,7 +191,7 @@ ENV PHP_OPCACHE_ENABLE=${PHP_OPCACHE_ENABLE} \
     QUEUE_WORKER_COUNT=${QUEUE_WORKER_COUNT}
 
 # Supervisor supervises the web/worker/scheduler/ssr processes
-COPY docker/supervisord.conf /etc/supervisor/laravel.conf
+COPY --chmod=644 docker/supervisord.conf /etc/supervisor/laravel.conf
 # Queue worker launcher (kept out of supervisord.conf's inline command= so
 # supervisor's shlex tokenizer never has to parse the shell logic)
 COPY --chmod=755 docker/worker-command.sh /usr/local/bin/worker-command.sh
@@ -223,6 +218,10 @@ RUN composer dump-autoload --no-plugins --no-scripts \
     && php artisan package:discover --ansi
 
 USER www-data
+
+EXPOSE 8080
+HEALTHCHECK --start-period=30s --interval=30s --timeout=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8080/up || exit 1
 
 # Default entry point: supervisord runs Octane + worker + scheduler (+ SSR when
 # toggled). Override the CMD to run a single process, e.g. for a cloud worker:

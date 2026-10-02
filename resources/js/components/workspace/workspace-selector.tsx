@@ -1,6 +1,7 @@
 import { usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -62,19 +63,22 @@ export function WorkspaceSelector() {
                                 />
                             }
                         >
-                            <div className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-accent text-[12.5px] font-semibold text-sidebar-accent-foreground">
-                                {current?.logo ? (
-                                    <img
+                            <Avatar className="size-8 overflow-hidden rounded-lg after:rounded-lg">
+                                {current?.logo && (
+                                    <AvatarImage
                                         alt={current.name}
                                         src={current.logo}
-                                        className="size-8 rounded-lg object-cover"
+                                        className="rounded-lg"
                                     />
-                                ) : current?.name ? (
-                                    getInitials(current.name)
-                                ) : (
-                                    <Users className="size-4" />
                                 )}
-                            </div>
+                                <AvatarFallback className="rounded-lg bg-sidebar-accent text-[12.5px] font-semibold text-sidebar-accent-foreground">
+                                    {current?.name ? (
+                                        getInitials(current.name)
+                                    ) : (
+                                        <Users className="size-4" />
+                                    )}
+                                </AvatarFallback>
+                            </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                                     Workspace
@@ -107,11 +111,16 @@ export function WorkspaceSelector() {
                                     onClick={() => handleSwitch(workspace.id)}
                                     className="cursor-pointer gap-2"
                                 >
-                                    <img
-                                        alt={workspace.name}
-                                        src={workspace.logo}
-                                        className="size-4 shrink-0 rounded object-cover"
-                                    />
+                                    <Avatar className="size-4 overflow-hidden rounded after:rounded">
+                                        <AvatarImage
+                                            alt={workspace.name}
+                                            src={workspace.logo}
+                                            className="rounded"
+                                        />
+                                        <AvatarFallback className="rounded bg-sidebar-accent text-[9px] font-semibold text-sidebar-accent-foreground">
+                                            {getInitials(workspace.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
                                     <span className="truncate">
                                         {workspace.name}
                                     </span>

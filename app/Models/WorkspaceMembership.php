@@ -27,12 +27,42 @@ class WorkspaceMembership extends Model
     /** @use HasFactory<WorkspaceMembershipFactory> */
     use HasFactory, HasUuids;
 
+    #[Override]
     protected static function booted(): void
     {
         // When a user is removed from (or leaves) a workspace, revoke any MCP
         // workspace grants their OAuth tokens hold for it, so a still-valid token
         // can't keep acting in a workspace they no longer belong to.
+        static::created(function (WorkspaceMembership $membership): void {
+            $workspace = $membership->workspace()->first();
+            if ($workspace !== null && $workspace->owner_id === $membership->user_id) {
+                $workspace->invalidateContentApprovals();
+            }
+        });
+
+        static::updating(function (WorkspaceMembership $membership): void {
+            if ($membership->isDirty(['role', 'workspace_id', 'user_id'])) {
+                $workspace = Workspace::query()->find((string) $membership->getOriginal('workspace_id'));
+                if ($workspace !== null && $workspace->owner_id === $membership->getOriginal('user_id')) {
+                    $workspace->assertApprovalAuthorityMutable();
+                    $workspace->invalidateContentApprovals();
+                }
+            }
+        });
+
+        static::deleting(function (WorkspaceMembership $membership): void {
+            $workspace = $membership->workspace()->first();
+            if ($workspace !== null && $workspace->owner_id === $membership->user_id) {
+                $workspace->assertApprovalAuthorityMutable();
+            }
+        });
+
         static::deleted(function (WorkspaceMembership $membership): void {
+            $workspace = $membership->workspace()->first();
+            if ($workspace !== null && $workspace->owner_id === $membership->user_id) {
+                $workspace->invalidateContentApprovals();
+            }
+
             McpGrantWorkspace::query()
                 ->where('user_id', $membership->user_id)
                 ->where('workspace_id', $membership->workspace_id)

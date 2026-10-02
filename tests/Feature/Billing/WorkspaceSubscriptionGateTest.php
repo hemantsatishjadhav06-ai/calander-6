@@ -235,7 +235,7 @@ test('a failed x publish does not consume quota because the job no longer pre-ch
 
     app()->instance(PublishConnectorRegistry::class, new class($connector) extends PublishConnectorRegistry
     {
-        public function __construct(private PublishConnector $connector) {}
+        public function __construct(private readonly PublishConnector $connector) {}
 
         public function for(Platform $platform): PublishConnector
         {
@@ -243,7 +243,7 @@ test('a failed x publish does not consume quota because the job no longer pre-ch
         }
     });
 
-    (new PublishPostTarget($target))->handle(
+    new PublishPostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),
@@ -289,7 +289,7 @@ test('x publishing stops before calling the connector when quota is exhausted', 
         }
     });
 
-    (new PublishPostTarget($target))->handle(
+    new PublishPostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),
@@ -351,7 +351,7 @@ test('x publishing reports a budget failure when the quota still has room', func
         }
     });
 
-    (new PublishPostTarget($target))->handle(
+    new PublishPostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),

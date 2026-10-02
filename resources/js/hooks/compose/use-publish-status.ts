@@ -1,5 +1,6 @@
 import { useHttp } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
     applyOptimisticSubmit,
@@ -23,19 +24,22 @@ type UsePublishStatus = {
  */
 export function usePublishStatus({ pagePost }: UsePublishStatus) {
     const [snapshot, setSnapshot] = useState<PostView | null>(pagePost);
+    const [previousPagePost, setPreviousPagePost] = useState(pagePost);
     const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(
         () => new Set(),
     );
+    const retryingRef = useRef(new Set<string>());
     const http = useHttp<Record<string, never>, RetryResponse>({});
 
     // Adopt the freshest page `post` prop (Inertia replaces it on each poll
     // reload). Mutation responses also flow in via `applyServerPost`; whichever
     // arrives last wins, which is correct because both reflect server truth.
-    useEffect(() => {
+    if (previousPagePost !== pagePost) {
+        setPreviousPagePost(pagePost);
         if (pagePost) {
             setSnapshot(pagePost);
         }
-    }, [pagePost]);
+    }
 
     /** Adopt the server's post after a publish/queue/schedule mutation. */
     function applyServerPost(post: PostView) {
@@ -49,21 +53,20 @@ export function usePublishStatus({ pagePost }: UsePublishStatus) {
      * it on request failure; on success the server post (or poll) supersedes it.
      */
     function applyOptimistic(optimistic: OptimisticSubmit): () => void {
-        let prior: PostView | null = null;
-        setSnapshot((current) => {
-            prior = current;
-
-            return current ? applyOptimisticSubmit(current, optimistic) : null;
-        });
+        const prior = snapshot;
+        setSnapshot((current) =>
+            current ? applyOptimisticSubmit(current, optimistic) : null,
+        );
 
         return () => setSnapshot(prior);
     }
 
     /** Re-dispatch a single failed target, then adopt the response. */
     async function retry(targetId: string) {
-        if (!snapshot || retryingIds.has(targetId)) {
+        if (!snapshot || retryingRef.current.has(targetId)) {
             return;
         }
+        retryingRef.current.add(targetId);
         setRetryingIds((prev) => new Set(prev).add(targetId));
         try {
             const result = await http.post(
@@ -74,7 +77,10 @@ export function usePublishStatus({ pagePost }: UsePublishStatus) {
                 { onNetworkError: () => undefined },
             );
             setSnapshot(result.post);
+        } catch {
+            toast.error('Could not retry this post. Please try again.');
         } finally {
+            retryingRef.current.delete(targetId);
             setRetryingIds((prev) => {
                 const next = new Set(prev);
                 next.delete(targetId);

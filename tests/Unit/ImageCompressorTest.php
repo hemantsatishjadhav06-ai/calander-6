@@ -19,7 +19,6 @@ function compressorJpeg(int $width = 1200, int $height = 1200): string
     ob_start();
     imagejpeg($img, null, 100);
     $bytes = (string) ob_get_clean();
-    imagedestroy($img);
 
     return $bytes;
 }
@@ -36,7 +35,6 @@ function compressorWebp(): string
     ob_start();
     imagewebp($img);
     $bytes = (string) ob_get_clean();
-    imagedestroy($img);
 
     return $bytes;
 }
@@ -150,7 +148,7 @@ test('an image exceeding the pixel guard is left untouched without decoding', fu
 
     // maxPixels below the image's pixel count -> the decode guard trips before any canvas
     // allocation, so the oversized image is returned untouched rather than compressed.
-    $result = (new ImageCompressor(maxPixels: 100))->compressToFit($bytes, (int) (strlen($bytes) * 0.6), 'image/jpeg', WEBP_ALLOWED);
+    $result = new ImageCompressor(maxPixels: 100)->compressToFit($bytes, (int) (strlen($bytes) * 0.6), 'image/jpeg', WEBP_ALLOWED);
 
     expect($result->wasCompressed)->toBeFalse()
         ->and($result->bytes)->toBe($bytes)

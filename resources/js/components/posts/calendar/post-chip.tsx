@@ -45,11 +45,12 @@ export function PostChip({
     post: PostRowData;
     draggable: boolean;
 }) {
+    const canDrag = draggable && !post.approval?.required;
     const { attributes, listeners, setNodeRef, transform, isDragging } =
         useDraggable({
             id: `post-${post.id}`,
             data: { postId: post.id, scheduledAt: post.scheduled_at },
-            disabled: !draggable,
+            disabled: !canDrag,
         });
 
     const tz = useSchedulingTimezone();
@@ -83,7 +84,7 @@ export function PostChip({
         <div
             ref={setNodeRef}
             style={style}
-            {...(draggable ? listeners : {})}
+            {...(canDrag ? listeners : {})}
             {...attributes}
             onClick={openPost}
             className={cn(
@@ -91,7 +92,7 @@ export function PostChip({
                 'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
                 tone.chip,
                 tone.pulse && 'animate-pulse',
-                draggable
+                canDrag
                     ? 'cursor-grab active:cursor-grabbing'
                     : 'cursor-pointer',
                 isDragging && 'opacity-50',

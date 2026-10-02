@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/icons';
 import { useSchedulingTimezone } from '@/hooks/posts/use-scheduling-timezone';
 import { dayjs } from '@/lib/datetime/dayjs';
+import { canPubliclyShare } from '@/lib/posts/approval';
 import { postCapabilities } from '@/lib/posts/capabilities';
 import { postLiveStatus } from '@/lib/posts/live-status';
 import { index as engagementRoute } from '@/routes/engagement';
@@ -239,17 +240,18 @@ export function PostPageActions({ post }: Props) {
                             </span>
                         </Button>
                     )}
-                    {post.status !== 'draft' && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            aria-label="Share"
-                            onClick={() => setShareOpen(true)}
-                        >
-                            <Share2 className="size-3.5" aria-hidden />
-                            <span className="hidden sm:inline">Share</span>
-                        </Button>
-                    )}
+                    {post.status !== 'draft' &&
+                        canPubliclyShare(post.approval) && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                aria-label="Share"
+                                onClick={() => setShareOpen(true)}
+                            >
+                                <Share2 className="size-3.5" aria-hidden />
+                                <span className="hidden sm:inline">Share</span>
+                            </Button>
+                        )}
                     {caps.canDuplicate && (
                         <Button
                             size="sm"

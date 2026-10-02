@@ -65,7 +65,7 @@ test('handle() loads real placement rows and wires mediaBySection through the re
         return PublishResult::success(['111', '222', '333']);
     });
 
-    (new PublishPostTarget($target->fresh()))->handle(
+    new PublishPostTarget($target->fresh())->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),
@@ -99,7 +99,7 @@ test('handle() with no placement rows falls back to all media on the first secti
         return PublishResult::success(['111']);
     });
 
-    (new PublishPostTarget($target->fresh()))->handle(
+    new PublishPostTarget($target->fresh())->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),

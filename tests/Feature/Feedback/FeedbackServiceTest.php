@@ -41,7 +41,7 @@ it('posts a JSON embed to the webhook when there is no screenshot', function () 
             && $embed['description'] === 'It broke'
             && $embed['color'] === FeedbackType::Bug->color()
             && collect($embed['fields'])->contains(fn ($f) => $f['value'] === 'ada@test.co')
-            && collect($embed['fields'])->contains(fn ($f) => str_contains($f['value'], 'Acme'));
+            && collect($embed['fields'])->contains(fn ($f) => str_contains((string) $f['value'], 'Acme'));
     });
 });
 
@@ -119,6 +119,6 @@ it('truncates an oversized url to fit the Discord field value limit', function (
     Http::assertSent(function ($request) {
         $field = collect($request['embeds'][0]['fields'])->firstWhere('name', 'Page');
 
-        return $field !== null && mb_strlen($field['value']) <= 1024;
+        return $field !== null && is_string($field['value']) && mb_strlen($field['value']) <= 1024;
     });
 });

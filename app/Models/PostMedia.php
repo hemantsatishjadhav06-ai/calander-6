@@ -6,13 +6,16 @@ namespace App\Models;
 
 use App\Concerns\HasWorkspaceScope;
 use App\Services\Media\DerivedMedia;
+use App\Services\Posts\PostApprovalService;
 use App\Support\FileStorage;
 use Database\Factories\PostMediaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Override;
 
 /**
  * @property string $id
@@ -51,12 +54,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'source_path',
     'edit_settings',
 ])]
+#[Table(name: 'post_media')]
 class PostMedia extends Model
 {
     /** @use HasFactory<PostMediaFactory> */
     use HasFactory, HasUuids, HasWorkspaceScope;
-
-    protected $table = 'post_media';
 
     /**
      * In-memory default so a row freshly created without an explicit kind still
@@ -64,15 +66,31 @@ class PostMedia extends Model
      *
      * @var array<string, mixed>
      */
+    #[Override]
     protected $attributes = ['kind' => 'image'];
 
     /**
      * Delete the backing file(s) when the row is removed, so storage doesn't
      * accumulate orphans. Covers both the composed file and a retained source.
      */
+    #[Override]
     protected static function booted(): void
     {
+        static::saving(function (PostMedia $media): void {
+            if ($media->isDirty(['post_id', 'path', 'disk', 'mime', 'kind', 'size_bytes', 'alt_text', 'position', 'edit_settings', 'width', 'height', 'duration_seconds'])) {
+                $postIds = array_filter([$media->post_id, $media->getOriginal('post_id')]);
+                foreach (array_unique($postIds) as $postId) {
+                    if (($post = Post::withoutGlobalScopes()->whereKey((string) $postId)->first()) !== null) {
+                        app(PostApprovalService::class)->invalidate($post);
+                    }
+                }
+            }
+        });
+
         static::deleting(function (PostMedia $media): void {
+            if ($media->post_id !== null && ($post = Post::withoutGlobalScopes()->find($media->post_id)) !== null) {
+                app(PostApprovalService::class)->invalidate($post);
+            }
             FileStorage::disk($media->disk)->delete($media->path);
 
             // Publish-time format conversions (JPEG for Meta, MP4 for GIFs) live
@@ -104,6 +122,7 @@ class PostMedia extends Model
     /**
      * @return array<string, string>
      */
+    #[Override]
     protected function casts(): array
     {
         return ['edit_settings' => 'array'];

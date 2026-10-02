@@ -5,6 +5,7 @@ use App\Enums\Platform;
 use App\Models\ConnectedAccount;
 use App\Models\PostTarget;
 use App\Services\Publishing\Connectors\XConnector;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 test('X repost calls the retweets endpoint and returns the source tweet id', function (): void {
@@ -24,7 +25,7 @@ test('X repost calls the retweets endpoint and returns the source tweet id', fun
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['TWEET456']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/2/users/USER123/retweets')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/2/users/USER123/retweets')
         && $request['tweet_id'] === 'TWEET456'
         && $request->hasHeader('Authorization', 'Bearer tok'));
 });
@@ -41,7 +42,7 @@ test('X repost maps a failed response to a failure result', function (): void {
 });
 
 test('X repost maps a connection failure to a retryable network result', function (): void {
-    Http::fake(fn () => throw new Illuminate\Http\Client\ConnectionException('offline'));
+    Http::fake(fn () => throw new ConnectionException('offline'));
 
     $account = ConnectedAccount::factory()->create(['platform' => Platform::X, 'remote_account_id' => 'U']);
     $target = PostTarget::factory()->create(['connected_account_id' => $account->id, 'platform' => Platform::X, 'remote_id' => 'T']);

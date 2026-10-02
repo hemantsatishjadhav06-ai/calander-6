@@ -11,6 +11,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('Get the bound workspace posting schedule: timezone and the recurring weekly time slots used when queueing posts.')]
 class GetPostingScheduleTool extends WorkspaceTool
@@ -45,6 +46,7 @@ class GetPostingScheduleTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [];

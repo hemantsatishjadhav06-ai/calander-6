@@ -46,7 +46,7 @@ test('media attaches to the section the resolver assigned, not always the first'
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['at://r/1', 'at://r/2']);
 
-    $requests = Http::recorded(fn ($request) => str_contains($request->url(), 'com.atproto.repo.createRecord'))
+    $requests = Http::recorded(fn ($request) => str_contains((string) $request->url(), 'com.atproto.repo.createRecord'))
         ->values();
 
     expect($requests)->toHaveCount(2);
@@ -104,10 +104,10 @@ test('a resumed publish still uploads and embeds images for a not-yet-posted sec
 
     expect($result->isSuccessful())->toBeTrue();
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'com.atproto.repo.uploadBlob'));
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), 'com.atproto.repo.uploadBlob'));
 
     Http::assertSent(function ($request): bool {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 
@@ -164,7 +164,7 @@ test('bluesky caps images per section, not per whole thread', function (): void 
 
     expect($result->isSuccessful())->toBeTrue();
 
-    $requests = Http::recorded(fn ($request): bool => str_contains($request->url(), 'com.atproto.repo.createRecord'))
+    $requests = Http::recorded(fn ($request): bool => str_contains((string) $request->url(), 'com.atproto.repo.createRecord'))
         ->values();
 
     $firstImages = $requests[0][0]['record']['embed']['images'] ?? [];
@@ -218,7 +218,7 @@ test('a video on one section does not block image blobs for a later section', fu
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['at://r/1', 'at://r/2']);
 
-    $requests = Http::recorded(fn ($request) => str_contains($request->url(), 'com.atproto.repo.createRecord'))
+    $requests = Http::recorded(fn ($request) => str_contains((string) $request->url(), 'com.atproto.repo.createRecord'))
         ->values();
 
     expect($requests)->toHaveCount(2);
@@ -281,12 +281,12 @@ test('a resumed publish still embeds images for a pending section after the vide
     expect($result->isSuccessful())->toBeTrue();
 
     // The video job status should never be polled — the video's section already posted.
-    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'video.bsky.app'));
+    Http::assertNotSent(fn ($request): bool => str_contains((string) $request->url(), 'video.bsky.app'));
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'com.atproto.repo.uploadBlob'));
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), 'com.atproto.repo.uploadBlob'));
 
     Http::assertSent(function ($request): bool {
-        if (! str_contains($request->url(), 'com.atproto.repo.createRecord')) {
+        if (! str_contains((string) $request->url(), 'com.atproto.repo.createRecord')) {
             return false;
         }
 

@@ -10,22 +10,22 @@ use App\Models\Post;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-class CreateDemoAccount extends Command
-{
-    use ConfirmableTrait;
-
-    protected $signature = 'demo:create
+#[Description('Provision (or reset) a demo login in its own workspace, printing a freshly generated password once.')]
+#[Signature('demo:create
         {--email=demo@example.com : Email address for the demo login}
         {--name=Demo User : Display name for the demo login}
         {--password= : Set this password instead of generating one, for hosts whose command output cannot be read back}
-        {--force : Run without confirmation outside local}';
-
-    protected $description = 'Provision (or reset) a demo login in its own workspace, printing a freshly generated password once.';
+        {--force : Run without confirmation outside local}')]
+class CreateDemoAccount extends Command
+{
+    use ConfirmableTrait;
 
     /**
      * Sample drafts and scheduled posts, so the demo workspace is not empty on
@@ -34,7 +34,7 @@ class CreateDemoAccount extends Command
      *
      * @var list<array{text: string, status: PostStatus, in_hours: int|null}>
      */
-    private const SAMPLE_POSTS = [
+    private const array SAMPLE_POSTS = [
         [
             'text' => "Welcome to SM Manager 👋\n\nThis is a draft. Open it in the composer, edit the text, and pick which accounts it goes to.",
             'status' => PostStatus::Draft,
@@ -46,12 +46,12 @@ class CreateDemoAccount extends Command
             'in_hours' => 24,
         ],
         [
-            'text' => "Drag a post around the calendar to reschedule it. Drop it on a past slot and it stays where it was.",
+            'text' => 'Drag a post around the calendar to reschedule it. Drop it on a past slot and it stays where it was.',
             'status' => PostStatus::Scheduled,
             'in_hours' => 72,
         ],
         [
-            'text' => "Connect an account under Accounts to start publishing for real. Nothing here is connected yet, so nothing can go out by accident.",
+            'text' => 'Connect an account under Accounts to start publishing for real. Nothing here is connected yet, so nothing can go out by accident.',
             'status' => PostStatus::Draft,
             'in_hours' => null,
         ],
@@ -61,7 +61,7 @@ class CreateDemoAccount extends Command
      * Short enough not to fight a host that mangles long command-line values,
      * long enough that the demo login is not brute-forced.
      */
-    private const MIN_PASSWORD_LENGTH = 12;
+    private const int MIN_PASSWORD_LENGTH = 12;
 
     public function handle(): int
     {

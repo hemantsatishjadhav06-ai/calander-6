@@ -325,6 +325,25 @@ describe('composerReducer', () => {
         expect(state.conflict).toBeNull();
     });
 
+    it('keeps edits made during initial draft creation unsaved until the next save', () => {
+        let state = composerReducer(initialComposerState(), {
+            type: 'saveStarted',
+        });
+        state = composerReducer(state, {
+            type: 'updateSegments',
+            segments: ['typed during creation'],
+        });
+        state = composerReducer(state, {
+            type: 'setPostId',
+            postId: 'post-1',
+            updatedAt: '2026-10-01T10:00:00Z',
+        });
+
+        expect(state.postId).toBe('post-1');
+        expect(state.segments).toEqual(['typed during creation']);
+        expect(state.saveState).toBe('dirty');
+    });
+
     it('tracks media via addMedia and removeMedia and marks dirty', () => {
         let state = composerReducer(hydrated(), {
             type: 'addMedia',
@@ -534,32 +553,36 @@ describe('composerReducer', () => {
         expect(next).toBe(saved);
     });
 
-    it('syncServerPost preserves local edits when the composer is dirty', () => {
-        const dirty = composerReducer(hydrated(), {
-            type: 'updateSegments',
-            segments: ['my unsaved edit'],
-        });
-        const server: PostView = {
-            id: 'post-1',
-            base_text: 'hello',
-            segments: ['hello'],
-            status: 'scheduled',
-            published_at: null,
-            updated_at: '2026-06-12T13:00:00+00:00',
-            scheduled_at: null,
-            auto_repost: null,
-            destination: { kind: 'all', id: null },
-            targets: [],
-            media: [],
-        };
-        const next = composerReducer(dirty, {
-            type: 'syncServerPost',
-            post: server,
-        });
-        expect(next).toBe(dirty);
-        expect(next.segments).toEqual(['my unsaved edit']);
-        expect(next.saveState).toBe('dirty');
-    });
+    it.each(['dirty', 'error', 'offline'] as const)(
+        'syncServerPost preserves local edits when the composer is %s',
+        (saveState) => {
+            const edited = composerReducer(hydrated(), {
+                type: 'updateSegments',
+                segments: ['my unsaved edit'],
+            });
+            const dirty = { ...edited, saveState };
+            const server: PostView = {
+                id: 'post-1',
+                base_text: 'hello',
+                segments: ['hello'],
+                status: 'scheduled',
+                published_at: null,
+                updated_at: '2026-06-12T13:00:00+00:00',
+                scheduled_at: null,
+                auto_repost: null,
+                destination: { kind: 'all', id: null },
+                targets: [],
+                media: [],
+            };
+            const next = composerReducer(dirty, {
+                type: 'syncServerPost',
+                post: server,
+            });
+            expect(next).toBe(dirty);
+            expect(next.segments).toEqual(['my unsaved edit']);
+            expect(next.saveState).toBe(saveState);
+        },
+    );
 
     it('syncServerPost fully re-hydrates when navigating to a different post', () => {
         const saved = hydrated();

@@ -33,7 +33,8 @@ class PostImageEditController extends Controller
 
     public function update(UpdatePostImageEditRequest $request, Post $post, PostMedia $media): JsonResponse
     {
-        abort_unless($media->workspace_id === $post->workspace_id, 404);
+        $media = PostMedia::query()->whereKey($media->id)->lockForUpdate()->firstOrFail();
+        abort_unless($media->workspace_id === $post->workspace_id && ($media->post_id === null || $media->post_id === $post->id), 404);
         abort_unless($post->status->isEditable(), 422, 'This post can no longer be edited.');
         // Animated media (GIF, or a GIF-browser WebP) has no editor client-side;
         // replacing one with a raster beautified frame would silently flatten the

@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Film, Image } from '@/components/ui/icons';
 import { useSchedulingTimezone } from '@/hooks/posts/use-scheduling-timezone';
 import { dayjs, toUserTz } from '@/lib/datetime/dayjs';
+import { approvalStatusMeta } from '@/lib/posts/approval';
 import { postStatusMeta } from '@/lib/posts/status';
 import { cn } from '@/lib/utils';
-import type { PlatformName, PostStatus } from '@/types/compose';
+import type { PlatformName, PostStatus, PostApproval } from '@/types/compose';
 
 import { PostRowActions } from './post-row-actions';
 
@@ -30,6 +31,7 @@ export type PostRowData = {
     targets: ChipTarget[];
     media_count: number;
     media_preview: { kind: 'image' | 'video'; url: string | null } | null;
+    approval?: PostApproval;
 };
 
 function formatWhen(
@@ -53,8 +55,11 @@ function formatWhen(
     return { when, time: d.format('h:mm A') };
 }
 
-function StatusBadge({ status }: { status: PostStatus }) {
-    const meta = postStatusMeta[status] ?? postStatusMeta.draft;
+function StatusBadge({ post }: { post: PostRowData }) {
+    const meta =
+        post.status === 'draft' && post.approval?.required
+            ? approvalStatusMeta[post.approval.status]
+            : (postStatusMeta[post.status] ?? postStatusMeta.draft);
     return <Badge variant={meta.variant}>{meta.label}</Badge>;
 }
 
@@ -243,7 +248,7 @@ export function PostRow({ post }: { post: PostRowData }) {
 
                 {/* Right: badge + actions */}
                 <div className="flex items-center gap-1.5">
-                    <StatusBadge status={post.status} />
+                    <StatusBadge post={post} />
                     <PostRowActions post={post} />
                 </div>
             </div>

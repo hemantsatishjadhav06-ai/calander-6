@@ -8,6 +8,7 @@ use App\Models\ConnectedAccount;
 use App\Models\ConnectedAccountSecret;
 use App\Services\Publishing\TokenManager;
 use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -137,6 +138,52 @@ test('fresh uses a token refreshed by another worker instead of refreshing again
 
     Http::assertNothingSent();
 });
+
+test('refresh lock contention is transient and leaves oauth credentials usable', function (Platform $platform, bool $force) {
+    $account = ConnectedAccount::factory()->create([
+        'platform' => $platform->value,
+        'auth_method' => 'oauth',
+        'status' => ConnectedAccountStatus::Active,
+        'token_expires_at' => $force ? now()->addHour() : now()->subMinute(),
+    ]);
+    $secret = ConnectedAccountSecret::factory()->create([
+        'connected_account_id' => $account->id,
+        'access_token' => 'existing-access',
+        'refresh_token' => 'existing-refresh',
+    ]);
+    $expiry = $account->token_expires_at;
+    $timeout = new LockTimeoutException;
+
+    $lock = Mockery::mock(Lock::class);
+    $lock->shouldReceive('block')->once()
+        ->with(10, Mockery::type('Closure'))
+        ->andThrow($timeout);
+    Cache::partialMock()->shouldReceive('lock')->once()
+        ->with("connected-account-token-refresh:{$account->id}", 120)
+        ->andReturn($lock);
+    Http::fake();
+
+    expect(fn () => app(TokenManager::class)->fresh($account, force: $force))
+        ->toThrow(function (TransientTokenRefreshException $exception) use ($timeout) {
+            expect($exception->getPrevious())->toBe($timeout);
+        });
+
+    expect($account->fresh()->status)->toBe(ConnectedAccountStatus::Active)
+        ->and($account->fresh()->refresh_failed_at)->toBeNull()
+        ->and($account->fresh()->token_expires_at->equalTo($expiry))->toBeTrue()
+        ->and($secret->fresh()->access_token)->toBe('existing-access')
+        ->and($secret->fresh()->refresh_token)->toBe('existing-refresh');
+    Http::assertNothingSent();
+})->with([
+    'x expired' => [Platform::X, false],
+    'x forced' => [Platform::X, true],
+    'linkedin expired' => [Platform::LinkedIn, false],
+    'linkedin forced' => [Platform::LinkedIn, true],
+    'bluesky oauth expired' => [Platform::Bluesky, false],
+    'bluesky oauth forced' => [Platform::Bluesky, true],
+    'threads expired' => [Platform::Threads, false],
+    'threads forced' => [Platform::Threads, true],
+]);
 
 test('fresh flips status and throws on refresh failure', function () {
     $account = ConnectedAccount::factory()->create([

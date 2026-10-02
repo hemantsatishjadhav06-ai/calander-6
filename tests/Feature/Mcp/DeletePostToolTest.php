@@ -71,3 +71,30 @@ test('delete_post with confirm soft-deletes a published post and dispatches remo
         fn (DeletePostTarget $job): bool => $job->target->is($targetWithRemote)
     );
 });
+
+test('delete_post preserves in-flight targets and cleans up partial thread ids', function (): void {
+    Queue::fake();
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $user->forceFill(['current_workspace_id' => $workspace->id])->save();
+    bindTokenToWorkspace($user, $workspace);
+    $post = Post::factory()->for($workspace)->create(['status' => PostStatus::Publishing]);
+    $partial = PostTarget::factory()->for($post)->create([
+        'status' => PostTargetStatus::Publishing,
+        'remote_id' => null,
+        'remote_ids' => ['thread-segment-1'],
+    ]);
+    $pending = PostTarget::factory()->for($post)->create([
+        'status' => PostTargetStatus::Pending,
+        'next_attempt_at' => now()->addMinutes(5),
+    ]);
+
+    ShoutrrrServer::actingAs($user)->tool(DeletePostTool::class, ['post_id' => $post->id, 'confirm' => true])->assertOk();
+
+    expect($post->refresh()->status)->toBe(PostStatus::Deleted)
+        ->and($partial->refresh()->status)->toBe(PostTargetStatus::Deleting)
+        ->and($pending->refresh()->status)->toBe(PostTargetStatus::Deleted)
+        ->and($pending->next_attempt_at)->toBeNull();
+    Queue::assertPushed(DeletePostTarget::class, 1);
+    Queue::assertPushed(DeletePostTarget::class, fn (DeletePostTarget $job): bool => $job->target->is($partial));
+});

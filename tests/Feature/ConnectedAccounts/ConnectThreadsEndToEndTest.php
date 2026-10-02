@@ -42,6 +42,8 @@ function threadsOwnerActingIn(): array
 
 function fakeThreadsOAuthUser(array $data): SocialiteUser
 {
+    fakeAccountConnectionIntent('threads');
+
     $user = (new SocialiteUser)
         ->map([
             'id' => $data['id'],
@@ -54,7 +56,7 @@ function fakeThreadsOAuthUser(array $data): SocialiteUser
     $provider = Mockery::mock(AbstractProvider::class);
     $provider->shouldReceive('setScopes')->andReturnSelf();
     $provider->shouldReceive('redirectUrl')->andReturnSelf();
-    $provider->shouldReceive('redirect')->andReturn(redirect('https://threads.net/oauth/authorize?client_id=threads-cid'));
+    $provider->shouldReceive('redirect')->andReturn(redirect('https://threads.net/oauth/authorize?client_id=threads-cid&state=test-oauth-state'));
     $provider->shouldReceive('user')->andReturn($user);
 
     Socialite::shouldReceive('driver')->with('threads')->andReturn($provider);
@@ -70,7 +72,7 @@ test('redirect sends an owner to threads.net when threads is configured', functi
     fakeThreadsOAuthUser(['id' => 'threads-1']);
 
     test()->get('/accounts/connect/threads')
-        ->assertRedirect('https://threads.net/oauth/authorize?client_id=threads-cid');
+        ->assertRedirect('https://threads.net/oauth/authorize?client_id=threads-cid&state=test-oauth-state');
 });
 
 test('callback exchanges the short-lived token for a long-lived one and persists a threads account', function () {
@@ -93,7 +95,7 @@ test('callback exchanges the short-lived token for a long-lived one and persists
         ]),
     ]);
 
-    test()->get('/accounts/callback/threads')
+    test()->get('/accounts/callback/threads?state=test-oauth-state')
         ->assertRedirect(route('accounts.index'))
         ->assertSessionHas('success', 'Threads account connected.');
 
@@ -127,7 +129,7 @@ test('callback redirects with a friendly error instead of 500ing when the long-l
         'https://graph.threads.net/access_token*' => Http::response(['error' => ['message' => 'bad token']], 400),
     ]);
 
-    test()->get('/accounts/callback/threads')
+    test()->get('/accounts/callback/threads?state=test-oauth-state')
         ->assertRedirect(route('accounts.index'))
         ->assertSessionHas('error');
 
@@ -163,10 +165,10 @@ test('the freshly connected threads account can publish through the registered c
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['post-1']);
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/threads123/threads')
-        && ! str_contains($request->url(), 'threads_publish')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/threads123/threads')
+        && ! str_contains((string) $request->url(), 'threads_publish')
         && $request['text'] === 'hello from the launched threads connector');
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/threads123/threads_publish')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/threads123/threads_publish')
         && $request['creation_id'] === 'container-1');
 });

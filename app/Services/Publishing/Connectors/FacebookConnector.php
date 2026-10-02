@@ -58,7 +58,7 @@ class FacebookConnector implements PublishConnector
 
         $pageId = (string) $context->account->remote_account_id;
         $text = implode("\n\n", array_values(array_filter(
-            array_map(static fn (string $segment): string => trim($segment), $context->segments),
+            array_map(trim(...), $context->segments),
             static fn (string $segment): bool => $segment !== '',
         )));
 

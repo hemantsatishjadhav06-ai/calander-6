@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Posts;
 
-final class SplitResult
+final readonly class SplitResult
 {
     /**
      * @param  list<string>  $sections
@@ -12,8 +12,8 @@ final class SplitResult
      * @param  list<int>  $sectionSources  Authored-segment index per section.
      */
     public function __construct(
-        public readonly array $sections,
-        public readonly array $issues,
-        public readonly array $sectionSources = [],
+        public array $sections,
+        public array $issues,
+        public array $sectionSources = [],
     ) {}
 }

@@ -39,9 +39,9 @@ test('fetchRepliesForConversations batches conversation ids into one search call
     expect($out['502']->replies)->toHaveCount(0);
     expect($out['502']->isOk())->toBeTrue();
 
-    Http::assertSent(fn ($req) => str_contains(urldecode($req->url()), 'conversation_id:500 OR conversation_id:501 OR conversation_id:502')
-        && str_contains(urldecode($req->url()), '-from:owner')
-        && ! str_contains(urldecode($req->url()), '-from:@'));
+    Http::assertSent(fn ($req) => str_contains(urldecode((string) $req->url()), 'conversation_id:500 OR conversation_id:501 OR conversation_id:502')
+        && str_contains(urldecode((string) $req->url()), '-from:owner')
+        && ! str_contains(urldecode((string) $req->url()), '-from:@'));
 });
 
 test('a rate-limited batch shares the failure across every id in the chunk', function () {
@@ -58,7 +58,7 @@ test('a rate-limited first chunk stops further requests and marks every id', fun
     Http::fake(['api.twitter.com/2/tweets/search/recent*' => Http::response(['title' => 'Too Many Requests'], 429, ['Retry-After' => '30'])]);
 
     // Enough conversation ids to span more than one query-length chunk.
-    $ids = array_map('strval', range(1, 40));
+    $ids = array_map(strval(...), range(1, 40));
     $out = xBatchConnector()->fetchRepliesForConversations(xBatchAccount(), $ids, ['access_token' => 't'], null);
 
     Http::assertSentCount(1);
@@ -95,7 +95,7 @@ test('fetchRepliesForConversations follows next_token pagination and aggregates 
     expect($out['500']->isOk())->toBeTrue();
 
     // The second request must carry the first page's next_token.
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'next_token=PAGE2'));
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'next_token=PAGE2'));
 });
 
 test('pagination stops at the configured page cap and logs truncation', function () {

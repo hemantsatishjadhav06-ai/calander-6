@@ -32,7 +32,7 @@ test('postReply uploads images and attaches media_ids to the tweet', function ()
 
     expect($result->isOk())->toBeTrue();
     expect($result->remoteReplyId)->toBe('999');
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/2/tweets')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/2/tweets')
         && ($r['media']['media_ids'][0] ?? null) === '111');
 });
 
@@ -56,7 +56,7 @@ test('postReply uploads video via chunked init/append/finalize/STATUS and attach
     expect($result->remoteReplyId)->toBe('888');
     Http::assertSent(fn ($request): bool => $request->method() === 'GET'
         && $request->url() === 'https://api.x.com/2/media/upload?media_id=222');
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/2/tweets')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/2/tweets')
         && ($r['media']['media_ids'][0] ?? null) === '222');
 });
 
@@ -103,6 +103,6 @@ test('postReply tolerates an in_progress STATUS and polls until succeeded', func
     // Proves the loop did not give up on the first in_progress response: it
     // polled twice (once in_progress, then succeeded).
     expect($statusCalls)->toBe(2);
-    Http::assertSent(fn ($r) => str_contains($r->url(), '/2/tweets')
+    Http::assertSent(fn ($r) => str_contains((string) $r->url(), '/2/tweets')
         && ($r['media']['media_ids'][0] ?? null) === '333');
 });

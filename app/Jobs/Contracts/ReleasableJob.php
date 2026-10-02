@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs\Contracts;
 
+use DateInterval;
+use DateTimeInterface;
+
 /**
  * A queued job that can release itself back onto the queue — satisfied by the
  * framework's InteractsWithQueue trait. Lets the reply-fetch throttle middleware
@@ -12,7 +15,7 @@ namespace App\Jobs\Contracts;
 interface ReleasableJob
 {
     /**
-     * @param  \DateTimeInterface|\DateInterval|int  $delay
+     * @param  DateTimeInterface|DateInterval|int  $delay
      * @return mixed
      */
     public function release($delay = 0);

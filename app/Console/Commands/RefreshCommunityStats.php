@@ -6,15 +6,15 @@ namespace App\Console\Commands;
 
 use App\Services\Community\GithubStatsFetcher;
 use App\Support\CommunityStats;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 
+#[Description('Fetch the GitHub star count and newest release tags (stable + overall) for the sidebar community card.')]
+#[Signature('community:refresh-stats')]
 class RefreshCommunityStats extends Command
 {
-    protected $signature = 'community:refresh-stats';
-
-    protected $description = 'Fetch the GitHub star count and newest release tags (stable + overall) for the sidebar community card.';
-
     public function handle(GithubStatsFetcher $fetcher): int
     {
         if (config('subscriptions.enabled')) {

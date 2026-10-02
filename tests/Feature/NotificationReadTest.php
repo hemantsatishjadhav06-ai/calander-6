@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceMembership;
+use App\Notifications\PostPublishedNotification;
 use Illuminate\Support\Str;
 
 function makeNotification(User $user, ?string $workspaceId, ?string $readAt = null): string
@@ -11,7 +13,7 @@ function makeNotification(User $user, ?string $workspaceId, ?string $readAt = nu
     $id = (string) Str::uuid();
     $user->notifications()->create([
         'id' => $id,
-        'type' => 'App\\Notifications\\PostPublishedNotification',
+        'type' => PostPublishedNotification::class,
         'data' => ['event' => 'post_published', 'title' => 'X', 'body' => '', 'href' => null, 'icon' => 'bell', 'workspace_id' => $workspaceId],
         'read_at' => $readAt,
     ]);
@@ -22,6 +24,7 @@ function makeNotification(User $user, ?string $workspaceId, ?string $readAt = nu
 test('a user can mark one notification read', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     $id = makeNotification($user, $ws->id);
 
@@ -45,6 +48,7 @@ test('mark-all-read clears unread for the current workspace and global notificat
     $user = User::factory()->create();
     $wsA = Workspace::factory()->create();
     $wsB = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $wsA->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $wsA->id])->save();
     makeNotification($user, $wsA->id);
     makeNotification($user, null);
@@ -59,6 +63,7 @@ test('mark-all-read clears unread for the current workspace and global notificat
 test('a user can delete one notification', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     $id = makeNotification($user, $ws->id);
 
@@ -82,6 +87,7 @@ test('delete-all removes notifications for the current workspace and global noti
     $user = User::factory()->create();
     $wsA = Workspace::factory()->create();
     $wsB = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $wsA->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $wsA->id])->save();
     $aId = makeNotification($user, $wsA->id);
     $globalId = makeNotification($user, null);
@@ -97,6 +103,7 @@ test('delete-all removes notifications for the current workspace and global noti
 test('a json request can delete one notification without a redirect', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     $id = makeNotification($user, $ws->id);
 
@@ -110,6 +117,7 @@ test('a json request can delete one notification without a redirect', function (
 test('a json request can delete all notifications without a redirect', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     $id = makeNotification($user, $ws->id);
 
@@ -123,6 +131,7 @@ test('a json request can delete all notifications without a redirect', function 
 test('a json request can mark one notification read without a redirect', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     $id = makeNotification($user, $ws->id);
 
@@ -136,6 +145,7 @@ test('a json request can mark one notification read without a redirect', functio
 test('a json request can mark all notifications read without a redirect', function () {
     $user = User::factory()->create();
     $ws = Workspace::factory()->create();
+    WorkspaceMembership::factory()->create(['workspace_id' => $ws->id, 'user_id' => $user->id]);
     $user->forceFill(['current_workspace_id' => $ws->id])->save();
     makeNotification($user, $ws->id);
 

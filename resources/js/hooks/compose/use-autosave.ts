@@ -1,3 +1,4 @@
+import { HttpNetworkError, HttpResponseError } from '@inertiajs/core';
 import { useHttp } from '@inertiajs/react';
 import { useEffect, useRef } from 'react';
 
@@ -15,6 +16,15 @@ export const AUTOSAVE_DEBOUNCE_MS = 500;
 
 type SaveResponse = { post: PostView };
 
+function contentSignature(state: ComposerState, accountIds: string[]): string {
+    return JSON.stringify({
+        ...buildPutBody(state, accountIds),
+        // The server version changes on every successful save; only editor
+        // content and destination changes require another request.
+        expected_updated_at: null,
+    });
+}
+
 type UseAutosave = {
     state: ComposerState;
     accountIds: string[];
@@ -25,6 +35,8 @@ type UseAutosave = {
      * feed, which is a deferred prop and otherwise stays stale until reload).
      */
     onSaved?: () => void;
+    initialPost?: PostView | null;
+    onServerPost?: (post: PostView) => void;
 };
 
 /**
@@ -40,6 +52,8 @@ export function useAutosave({
     accountIds,
     dispatch,
     onSaved,
+    initialPost = null,
+    onServerPost,
 }: UseAutosave) {
     // TForm must satisfy FormDataType; the hook's own data is unused (we submit
     // via transform), so Record<string, never> is the minimal valid shape.
@@ -48,12 +62,19 @@ export function useAutosave({
     // The save currently in flight, tracked as a promise (not a boolean) so a
     // forced `flush` can await it before starting the next save — this is what
     // lets publishing wait for the draft (media, targets) to be persisted first.
-    const inFlight = useRef<Promise<void> | null>(null);
+    const inFlight = useRef<Promise<boolean> | null>(null);
+    const stateRef = useRef(state);
+    stateRef.current = state;
+    const accountIdsRef = useRef(accountIds);
+    accountIdsRef.current = accountIds;
+    const savedContentRef = useRef<{
+        postId: string;
+        signature: string;
+    } | null>(null);
     // Latest known post id, mirrored in a ref so a concurrent `ensurePost` can
     // read it after awaiting an in-flight create (the reducer `state` closure is
     // stale inside an async call).
     const postIdRef = useRef<string | null>(state.postId);
-    postIdRef.current = state.postId;
     // Latest server-acknowledged updated_at, mirrored in a ref so a save queued
     // behind an in-flight one sends the freshest `expected_updated_at` rather
     // than a stale React-closure snapshot — otherwise a single user's own
@@ -61,6 +82,18 @@ export function useAutosave({
     // themselves. Updated synchronously on every server response below, and via
     // the effect for external changes (hydrate / conflict resolution).
     const baselineRef = useRef<string | null>(state.baselineUpdatedAt);
+    const serverPostRef = useRef<PostView | null>(initialPost);
+
+    function rememberServerPost(post: PostView): void {
+        serverPostRef.current = post;
+        baselineRef.current = post.updated_at;
+        onServerPost?.(post);
+    }
+
+    function adoptServerPost(post: PostView): void {
+        rememberServerPost(post);
+        dispatch({ type: 'syncServerPost', post });
+    }
 
     /**
      * Create the draft post (POST). Shared by the autosave create-branch and by
@@ -68,23 +101,25 @@ export function useAutosave({
      * (e.g. a media-first upload). Returns the new post id.
      */
     async function createPost(): Promise<string> {
+        const current = stateRef.current;
+        const signature = contentSignature(current, accountIdsRef.current);
         http.transform(() => ({
-            segments: state.segments,
-            mentions: state.mentions,
-            destination: state.destination,
-            auto_repost: state.autoRepost,
+            segments: current.segments,
+            mentions: current.mentions,
+            destination: current.destination,
+            auto_repost: current.autoRepost,
             // Persist the thread structure and per-segment placements on the
             // very first save too, so a reload before the next autosave PUT
             // sees a consistent post (stale break ids would otherwise degrade
             // to positional fallbacks and misplace media onto the first post).
-            segment_breaks: state.segmentBreaks,
-            placements: flattenPlacements(state.placements),
+            segment_breaks: current.segmentBreaks,
+            placements: flattenPlacements(current.placements),
         }));
-        const created = await http.post(PostController.store().url, {
-            onNetworkError: () => dispatch({ type: 'saveFailedOffline' }),
-        });
+        const created = await http.post(PostController.store().url);
+        rememberServerPost(created.post);
         postIdRef.current = created.post.id;
         baselineRef.current = created.post.updated_at;
+        savedContentRef.current = { postId: created.post.id, signature };
         dispatch({
             type: 'setPostId',
             postId: created.post.id,
@@ -114,46 +149,69 @@ export function useAutosave({
 
         // expected_updated_at comes from the ref (latest server version), not the
         // possibly-stale closure, so a save queued behind another never 409s.
+        const current = stateRef.current;
+        const signature = contentSignature(current, accountIdsRef.current);
         http.transform(() => ({
-            ...buildPutBody(state, accountIds),
+            ...buildPutBody(current, accountIdsRef.current),
             expected_updated_at: baselineRef.current,
         }));
         await http.put(PostController.update(postId).url, {
             // onSuccess's first arg is the parsed response body (TResponse).
             onSuccess: (data) => {
+                rememberServerPost(data.post);
                 baselineRef.current = data.post.updated_at;
                 dispatch({ type: 'saveSucceeded', post: data.post });
                 onSaved?.();
             },
-            // onHttpException's response.data is typed `string` but may arrive
-            // parsed at runtime — handle both.
-            onHttpException: (response) => {
-                if (response.status !== 409) {
-                    return;
-                }
-                const raw = response.data;
+        });
+        savedContentRef.current = { postId, signature };
+    }
+
+    function reportSaveFailure(error: unknown): void {
+        savedContentRef.current = null;
+        if (
+            error instanceof HttpResponseError &&
+            error.response.status === 409
+        ) {
+            try {
+                const raw = error.response.data;
                 const body = (
                     typeof raw === 'string' ? JSON.parse(raw) : raw
                 ) as SaveResponse;
-                dispatch({ type: 'saveFailedStale', post: body.post });
-            },
-            onNetworkError: () => dispatch({ type: 'saveFailedOffline' }),
+                if (body?.post?.id) {
+                    dispatch({ type: 'saveFailedStale', post: body.post });
+
+                    return;
+                }
+            } catch {
+                // An invalid conflict response is still a failed save.
+            }
+        }
+        dispatch({
+            type:
+                error instanceof HttpNetworkError
+                    ? 'saveFailedOffline'
+                    : 'saveFailed',
         });
     }
 
     /**
      * Run `work` serialized behind any in-flight save, tracking it on `inFlight`
      * so the debounce, `flush`, and `ensurePost` wait rather than overlap. The
-     * tracked promise never rejects (failures are surfaced via the save
-     * callbacks → reducer), so awaiting it never blocks a subsequent publish.
+     * tracked promise resolves false on failure so dependent actions never
+     * publish a stale draft. Background saves do not produce unhandled rejections.
      */
-    function enqueueSave(work: () => Promise<unknown>): Promise<void> {
+    function enqueueSave(work: () => Promise<unknown>): Promise<boolean> {
         const prior = inFlight.current ?? Promise.resolve();
-        const tracked: Promise<void> = prior
+        const tracked: Promise<boolean> = prior
             .then(work, work)
             .then(
-                () => undefined,
-                () => undefined,
+                () => true,
+                (error: unknown) => {
+                    reportSaveFailure(error);
+
+                    return false;
+                },
             )
             .finally(() => {
                 if (inFlight.current === tracked) {
@@ -176,14 +234,14 @@ export function useAutosave({
             return postIdRef.current;
         }
         if (inFlight.current) {
-            await inFlight.current;
+            const saved = await inFlight.current;
 
-            return postIdRef.current ?? '';
+            return saved ? (postIdRef.current ?? '') : '';
         }
         dispatch({ type: 'saveStarted' });
-        await enqueueSave(createPost);
+        const saved = await enqueueSave(createPost);
 
-        return postIdRef.current ?? '';
+        return saved ? (postIdRef.current ?? '') : '';
     }
 
     /** Debounced autosave: only when dirty and nothing already in flight. */
@@ -207,27 +265,47 @@ export function useAutosave({
      * are durably persisted, so callers (e.g. publishing) can rely on media and
      * targets being saved server-side before the publish request fires.
      */
-    async function flush(): Promise<void> {
-        if (timer.current) {
-            clearTimeout(timer.current);
-            timer.current = null;
-        }
-        // Wait out any in-flight save so the forced save reflects the latest
-        // snapshot (e.g. media added just before clicking Publish).
-        if (inFlight.current) {
-            await inFlight.current;
-        }
-        if (state.saveState === 'saved' || state.saveState === 'idle') {
-            return;
-        }
-        // Same empty-draft guard as the debounced path: forcing a save (e.g. on
-        // a destination change or blur) must not create a blank draft either.
-        if (postIdRef.current === null && !composerHasContent(state)) {
-            dispatch({ type: 'saveSkippedEmpty' });
+    async function flush(): Promise<boolean> {
+        for (;;) {
+            if (timer.current) {
+                clearTimeout(timer.current);
+                timer.current = null;
+            }
+            // Other flushes and the debounce can share this save. Recheck after
+            // every request so typing during the await is persisted before a
+            // publish continuation can make the post read-only.
+            if (inFlight.current) {
+                if (!(await inFlight.current)) {
+                    return false;
+                }
+                continue;
+            }
+            const current = stateRef.current;
+            if (current.saveState === 'conflict') {
+                return false;
+            }
+            const savedContent = savedContentRef.current;
+            if (
+                savedContent?.postId === postIdRef.current &&
+                savedContent.signature ===
+                    contentSignature(current, accountIdsRef.current)
+            ) {
+                return true;
+            }
+            if (current.saveState === 'saved' || current.saveState === 'idle') {
+                return true;
+            }
+            // Destination changes alone must not create a blank draft.
+            if (postIdRef.current === null && !composerHasContent(current)) {
+                dispatch({ type: 'saveSkippedEmpty' });
 
-            return;
+                return true;
+            }
+
+            if (!(await enqueueSave(persist))) {
+                return false;
+            }
         }
-        await enqueueSave(persist);
     }
 
     // Debounce while dirty. `save` is intentionally re-created each render so the
@@ -271,6 +349,16 @@ export function useAutosave({
         baselineRef.current = state.baselineUpdatedAt;
     }, [state.baselineUpdatedAt]);
 
+    useEffect(() => {
+        postIdRef.current = state.postId;
+    }, [state.postId]);
+
+    useEffect(() => {
+        if (initialPost) {
+            serverPostRef.current = initialPost;
+        }
+    }, [initialPost]);
+
     // Flush on tab-hide.
     useEffect(() => {
         function onHide() {
@@ -284,5 +372,11 @@ export function useAutosave({
         // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, [state]);
 
-    return { flush, ensurePost, processing: http.processing };
+    return {
+        flush,
+        ensurePost,
+        getServerPost: () => serverPostRef.current,
+        adoptServerPost,
+        processing: http.processing,
+    };
 }

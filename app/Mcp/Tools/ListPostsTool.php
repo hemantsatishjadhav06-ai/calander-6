@@ -12,6 +12,7 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Override;
 
 #[Description('List posts in the bound workspace. Optionally filter by status or a text query.')]
 class ListPostsTool extends WorkspaceTool
@@ -43,6 +44,7 @@ class ListPostsTool extends WorkspaceTool
     /**
      * @return array<string, Type>
      */
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

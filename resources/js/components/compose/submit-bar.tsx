@@ -1,9 +1,11 @@
+import { HttpResponseError } from '@inertiajs/core';
 import { Link, router, useHttp } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import ComposerController from '@/actions/App/Http/Controllers/Posts/ComposerController';
 import PostingScheduleController from '@/actions/App/Http/Controllers/Posts/PostingScheduleController';
+import PostReviewController from '@/actions/App/Http/Controllers/Posts/PostReviewController';
 import PostScheduleController from '@/actions/App/Http/Controllers/Posts/PostScheduleController';
 import { Send } from '@/components/ui/icons';
 import {
@@ -19,10 +21,21 @@ import {
     OPTIMISTIC_SCHEDULE,
     type OptimisticSubmit,
 } from '@/lib/compose/publish-status';
+import {
+    hasCurrentApproval,
+    intendedSchedule,
+    reviewErrorData,
+    sameSchedule,
+} from '@/lib/posts/approval';
 import { cn } from '@/lib/utils';
 import { index as billingRoute } from '@/routes/billing';
 import { publish, queue } from '@/routes/posts';
-import type { PlatformLimits, PlatformName, PostView } from '@/types/compose';
+import type {
+    PlatformLimits,
+    PlatformName,
+    PostView,
+    PostApproval,
+} from '@/types/compose';
 
 type Props = {
     tray: ScheduleTray;
@@ -37,7 +50,7 @@ type Props = {
      * Awaited before publishing so the publish never races the save that
      * attaches media to the post.
      */
-    onSaveDraft: () => Promise<void>;
+    onSaveDraft: () => Promise<boolean>;
     /** Ensure a persisted post id before publishing; returns the post id. */
     onEnsurePost: () => Promise<string>;
     /** When in queue mode, true if there is no slot to queue into (no schedule, full, loading, or error). */
@@ -53,6 +66,12 @@ type Props = {
     blockedAccounts: AccountBlock[];
     /** Per-platform limits, for rendering block reasons. */
     limits: PlatformLimits[];
+    approvalRequired?: boolean;
+    approval?: PostApproval | null;
+    unsavedChanges?: boolean;
+    queueSlot?: string | null;
+    onGetServerPost?: () => PostView | null;
+    onReviewPost?: (post: PostView) => void;
 };
 
 export function hasBlockingIssues(blocked: AccountBlock[]): boolean {
@@ -168,32 +187,63 @@ export function SubmitBar({
     onServerPost,
     blockedAccounts,
     limits,
+    approvalRequired = false,
+    approval = null,
+    unsavedChanges = false,
+    queueSlot = null,
+    onGetServerPost,
+    onReviewPost,
 }: Props) {
     // useHttp verbs take NO inline data — the body is injected via transform()
     // at submit time so it always reflects the latest reducer state.
-    const http = useHttp<{ scheduled_at?: string | null }, { post: PostView }>(
-        {},
-    );
+    const http = useHttp<
+        { scheduled_at?: string | null; revision?: string },
+        { post: PostView }
+    >({});
     const [noSlot, setNoSlot] = useState(false);
     const [pastTime, setPastTime] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const submittingRef = useRef(false);
     const attentionBlocked = attentionHandles.length > 0;
     // Server-reported blocks (belt-and-suspenders for edge cases the client
     // pre-check missed). Keyed identically to client AccountBlock.
     const [serverBlocked, setServerBlocked] = useState<AccountBlock[]>([]);
     // Only reveal the block list after a submit attempt, so it doesn't nag before.
     const [showBlocked, setShowBlocked] = useState(false);
+    const [reviewRequested, setReviewRequested] = useState(false);
+    const plannedAt = intendedSchedule(tray, queueSlot);
+    const requiresApproval = approval?.required ?? approvalRequired;
+    const approved = !unsavedChanges && hasCurrentApproval(approval, plannedAt);
+    const awaitingApproval =
+        requiresApproval &&
+        !unsavedChanges &&
+        approval?.status === 'awaiting_approval' &&
+        sameSchedule(approval.planned_schedule_at, plannedAt);
+    useEffect(() => {
+        if (unsavedChanges || approval?.status !== 'awaiting_approval') {
+            setReviewRequested(false);
+        }
+    }, [unsavedChanges, approval?.status, approval?.revision]);
 
     // Prefer live client blocks; fall back to the last server response.
     const blocks = blockedAccounts.length > 0 ? blockedAccounts : serverBlocked;
 
     const submitLabel =
-        tray.mode === 'now'
-            ? 'Publish now'
-            : tray.mode === 'queue'
-              ? 'Add to queue'
-              : 'Schedule';
+        requiresApproval && !approved
+            ? awaitingApproval
+                ? 'Awaiting approval'
+                : 'Request approval'
+            : tray.mode === 'now'
+              ? 'Publish now'
+              : tray.mode === 'queue'
+                ? 'Add to queue'
+                : 'Schedule';
 
     async function handleSubmit() {
+        if (awaitingApproval) {
+            return;
+        }
         if (hasBlockingIssues(blockedAccounts)) {
             setShowBlocked(true);
             setServerBlocked([]);
@@ -206,7 +256,7 @@ export function SubmitBar({
                 disabled,
                 uploading,
                 attentionBlocked,
-                processing: http.processing,
+                processing: http.processing || submittingRef.current,
                 trayMode: tray.mode,
                 queueDisabled,
             })
@@ -214,92 +264,167 @@ export function SubmitBar({
             return;
         }
 
+        submittingRef.current = true;
+        setSubmitting(true);
         setNoSlot(false);
         setPastTime(false);
-        // Flush pending edits AND wait for them to persist before publishing —
-        // otherwise the publish request races the save that attaches media to
-        // the post, and the post publishes without its media.
-        await onSaveDraft();
-        const id = postId ?? (await onEnsurePost());
-        if (!id) {
-            return;
-        }
-
-        // Shared success path for all three modes: celebrate the post going out,
-        // adopt the server snapshot, then reload the compose page.
-        const onSuccess = ({ post }: { post: PostView }) => {
-            celebrate();
-            onServerPost(post);
-            router.visit(ComposerController.show(id).url);
-        };
-        const handleSubmitException = (
-            response: { status: number; data?: unknown },
-            revert: () => void,
-        ) => {
-            revert();
-            if (response.status === 402) {
-                router.visit(billingRoute().url);
+        setSubmitError(null);
+        setReviewRequested(false);
+        const requestReview = requiresApproval && !approved;
+        let revert: (() => void) | null = null;
+        try {
+            // Publishing must wait for a successful save of the current draft.
+            if (!(await onSaveDraft())) {
+                setSubmitError(
+                    'Your draft could not be saved. Resolve any conflict or retry saving before publishing.',
+                );
 
                 return;
             }
-            if (response.status === 422) {
-                const blocked = parseServerBlocked(response.data);
-                if (blocked.length > 0) {
-                    setServerBlocked(blocked);
-                    setShowBlocked(true);
+            const id = postId ?? (await onEnsurePost());
+            if (!id) {
+                setSubmitError(
+                    'Your draft could not be saved. Please try again.',
+                );
+
+                return;
+            }
+
+            if (requiresApproval) {
+                let savedPost = onGetServerPost?.();
+                if (!savedPost?.approval) {
+                    setSubmitError(
+                        'The review status could not be verified. Refresh this draft before continuing.',
+                    );
+
+                    return;
+                }
+                // Saving edits can invalidate the approved revision. A submission
+                // that began as a review request must never become a publication.
+                if (
+                    requestReview ||
+                    !hasCurrentApproval(savedPost.approval, plannedAt)
+                ) {
+                    if (
+                        !sameSchedule(
+                            savedPost.approval.planned_schedule_at,
+                            plannedAt,
+                        )
+                    ) {
+                        const revision = savedPost.approval.revision;
+                        http.transform(() => ({
+                            scheduled_at: plannedAt,
+                            revision,
+                        }));
+                        const planned = await http.put(
+                            PostReviewController.plan(id).url,
+                        );
+                        savedPost = planned.post;
+                        onReviewPost?.(savedPost);
+                    }
+                    const revision = savedPost.approval?.revision;
+                    if (!revision) {
+                        setSubmitError(
+                            'The saved draft has no review revision. Refresh and try again.',
+                        );
+
+                        return;
+                    }
+                    http.transform(() => ({ revision }));
+                    const requested = await http.post(
+                        PostReviewController.requestReview(id).url,
+                    );
+                    onReviewPost?.(requested.post);
+                    setReviewRequested(true);
+
+                    return;
                 }
             }
-        };
 
-        if (tray.mode === 'now') {
-            // Flip the chips to "Publishing" instantly; revert if the call fails.
-            const revert = onOptimisticSubmit(OPTIMISTIC_PUBLISH);
-            http.transform(() => ({}));
-            await http.post(publish(id).url, {
+            const onSuccess = ({ post }: { post: PostView }) => {
+                celebrate();
+                onServerPost(post);
+                router.visit(ComposerController.show(id).url);
+            };
+
+            if (tray.mode === 'now') {
+                revert = onOptimisticSubmit(OPTIMISTIC_PUBLISH);
+                http.transform(() => ({}));
+                await http.post(publish(id).url, { onSuccess });
+
+                return;
+            }
+
+            revert = onOptimisticSubmit(OPTIMISTIC_SCHEDULE);
+            if (tray.mode === 'queue') {
+                http.transform(() =>
+                    requiresApproval
+                        ? { scheduled_at: plannedAt }
+                        : tray.pickedAt
+                          ? { scheduled_at: tray.pickedAt }
+                          : {},
+                );
+                await http.post(queue(id).url, { onSuccess });
+
+                return;
+            }
+
+            http.transform(() => ({ scheduled_at: tray.pickedAt }));
+            await http.put(PostScheduleController.update(id).url, {
                 onSuccess,
-                onHttpException: (response) =>
-                    handleSubmitException(response, revert),
-                onNetworkError: revert,
             });
-
-            return;
-        }
-
-        if (tray.mode === 'queue') {
-            // Flip the chips to "Queued" instantly; revert if the call fails.
-            const revert = onOptimisticSubmit(OPTIMISTIC_SCHEDULE);
-            http.transform(() =>
-                tray.pickedAt ? { scheduled_at: tray.pickedAt } : {},
-            );
-            await http.post(queue(id).url, {
-                onSuccess,
-                // 422 = no open slot in the workspace posting schedule.
-                onHttpException: (response) => {
-                    handleSubmitException(response, revert);
-                    if (response.status === 422) {
-                        setNoSlot(true);
+        } catch (error) {
+            revert?.();
+            if (error instanceof HttpResponseError) {
+                if (
+                    requiresApproval &&
+                    (error.response.status === 409 ||
+                        error.response.status === 422 ||
+                        error.response.status === 403)
+                ) {
+                    const body = reviewErrorData(error.response.data);
+                    if (body.post) {
+                        onReviewPost?.(body.post);
                     }
-                },
-                onNetworkError: revert,
-            });
+                    setSubmitError(
+                        body.message ??
+                            'This draft needs a fresh review before it can be published.',
+                    );
 
-            return;
-        }
-
-        // mode === 'pick' → schedule at the chosen time (existing M2 path).
-        const revert = onOptimisticSubmit(OPTIMISTIC_SCHEDULE);
-        http.transform(() => ({ scheduled_at: tray.pickedAt }));
-        await http.put(PostScheduleController.update(id).url, {
-            onSuccess,
-            // 422 = the chosen time is in the past (server guard).
-            onHttpException: (response) => {
-                handleSubmitException(response, revert);
-                if (response.status === 422) {
-                    setPastTime(true);
+                    return;
                 }
-            },
-            onNetworkError: revert,
-        });
+                if (error.response.status === 402) {
+                    router.visit(billingRoute().url);
+
+                    return;
+                }
+                // useHttp rejects all HTTP failures, including 422 validation
+                // responses, which bypass its onHttpException callback.
+                if (error.response.status === 422) {
+                    const blocked = parseServerBlocked(error.response.data);
+                    if (blocked.length > 0) {
+                        setServerBlocked(blocked);
+                        setShowBlocked(true);
+                    } else if (tray.mode === 'queue') {
+                        setNoSlot(true);
+                    } else if (tray.mode === 'pick') {
+                        setPastTime(true);
+                    } else {
+                        setSubmitError(
+                            'This post could not be published. Check the content and selected accounts, then try again.',
+                        );
+                    }
+
+                    return;
+                }
+            }
+            setSubmitError(
+                'Your post could not be submitted. Please try again.',
+            );
+        } finally {
+            submittingRef.current = false;
+            setSubmitting(false);
+        }
     }
 
     useEffect(() => {
@@ -307,10 +432,10 @@ export function SubmitBar({
             if (
                 !isSubmitShortcut(event) ||
                 !shouldAllowSubmit({
-                    disabled,
+                    disabled: disabled || awaitingApproval,
                     uploading,
                     attentionBlocked,
-                    processing: http.processing,
+                    processing: http.processing || submitting,
                     trayMode: tray.mode,
                     queueDisabled,
                 })
@@ -328,10 +453,10 @@ export function SubmitBar({
     });
 
     const canSubmit = shouldAllowSubmit({
-        disabled,
+        disabled: disabled || awaitingApproval,
         uploading,
         attentionBlocked,
-        processing: http.processing,
+        processing: http.processing || submitting,
         trayMode: tray.mode,
         queueDisabled,
     });
@@ -356,7 +481,7 @@ export function SubmitBar({
             <div className="flex items-center gap-1.5">
                 <TrayButton
                     onClick={() => void onSaveDraft()}
-                    disabled={disabled}
+                    disabled={disabled || submitting}
                     className="flex-1 sm:flex-none"
                 >
                     Save draft
@@ -383,6 +508,16 @@ export function SubmitBar({
                     submitButton
                 )}
             </div>
+            {submitError && (
+                <p role="alert" className="text-[12px] text-destructive">
+                    {submitError}
+                </p>
+            )}
+            {reviewRequested && (
+                <p role="status" className="text-[12px] text-muted-foreground">
+                    Saved for review. Nothing has been published or scheduled.
+                </p>
+            )}
             {noSlot && (
                 <p className="text-[12px] text-muted-foreground">
                     No open slot in your posting schedule.{' '}

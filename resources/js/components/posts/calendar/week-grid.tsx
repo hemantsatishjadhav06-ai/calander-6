@@ -248,7 +248,11 @@ function HourCell({
                     <PostChip
                         key={p.id}
                         post={p}
-                        draggable={!past && p.status === 'scheduled'}
+                        draggable={
+                            !past &&
+                            p.status === 'scheduled' &&
+                            !p.approval?.required
+                        }
                     />
                 ))}
             </div>

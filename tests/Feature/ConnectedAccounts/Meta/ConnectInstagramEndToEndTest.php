@@ -3,6 +3,7 @@
 use App\Dto\Publishing\PublishContext;
 use App\Enums\Platform;
 use App\Enums\WorkspaceRole;
+use App\Jobs\FetchAccountMessages;
 use App\Models\ConnectedAccount;
 use App\Models\PostMedia;
 use App\Models\PostTarget;
@@ -11,7 +12,12 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use App\Services\Publishing\PublishConnectorRegistry;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+
+beforeEach(function (): void {
+    Queue::fake([FetchAccountMessages::class]);
+});
 
 /**
  * The positive path deferred from Task 2's ConnectMetaTest guard tests: with
@@ -41,6 +47,7 @@ test('posting a stashed page selection creates an instagram connected account an
     expect(Platform::launchedMetaGraphPlatforms())->toBe([Platform::Facebook, Platform::Instagram]);
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [
             'PAGE1' => [
                 'pageId' => 'PAGE1',
@@ -109,10 +116,10 @@ test('the freshly connected instagram account can publish through the registered
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['media-999']);
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/ig123/media')
-        && ! str_contains($request->url(), 'media_publish')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/ig123/media')
+        && ! str_contains((string) $request->url(), 'media_publish')
         && $request['caption'] === 'hello from the launched instagram connector');
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/ig123/media_publish')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/ig123/media_publish')
         && $request['creation_id'] === 'container-1');
 });

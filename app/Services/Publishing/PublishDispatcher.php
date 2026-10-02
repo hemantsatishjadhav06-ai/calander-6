@@ -9,6 +9,7 @@ use App\Enums\PostTargetStatus;
 use App\Jobs\PublishPostTarget;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Posts\PublishPrecheck;
 
 class PublishDispatcher
@@ -36,6 +37,7 @@ class PublishDispatcher
      */
     public function dispatchForPost(Post $post): void
     {
+        app(PostApprovalService::class)->assertPlan($post, $post->scheduled_at);
         $post->loadMissing(['targets.account', 'media']);
 
         $issuesByAccount = [];

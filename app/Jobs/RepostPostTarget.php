@@ -77,7 +77,12 @@ class RepostPostTarget implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $workspace = $target->post()->withoutGlobalScopes()->first()?->workspace;
+        $post = $target->post()->withoutGlobalScopes()->first();
+        $workspace = $post?->workspace;
+
+        if ($post === null || $workspace?->requires_post_approval) {
+            return;
+        }
 
         // Mirrors PublishPostTarget's subscription/X-budget gate. Inert on self-hosted
         // (WorkspaceSubscriptionGate::isEnabled() reads config('subscriptions.enabled')).
@@ -100,6 +105,10 @@ class RepostPostTarget implements ShouldBeUnique, ShouldQueue
             $credentials = $tokens->fresh($account);
         } catch (TokenRefreshException) {
             return; // transient; a later tick re-dispatches
+        }
+
+        if ($post->workspace()->value('requires_post_approval')) {
+            return;
         }
 
         $result = $registry->for($target->platform)->repost(new RepostContext($target, $account, $credentials));

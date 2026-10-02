@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\PublishPostTarget;
 use App\Models\Post;
 use App\Models\PostTarget;
+use App\Services\Posts\PostApprovalService;
 use App\Services\Publishing\PostStatusRollup;
 use App\Support\PostView;
 use Illuminate\Http\JsonResponse;
@@ -17,10 +18,12 @@ use Illuminate\Http\Request;
 
 class PostTargetRetryController extends Controller
 {
-    public function store(Request $request, Post $post, PostTarget $target): JsonResponse|RedirectResponse
+    public function store(Request $request, Post $post, PostTarget $target, PostApprovalService $approvals): JsonResponse|RedirectResponse
     {
         abort_unless($request->user()->can('update', $post), 403);
         abort_unless($target->status->isRetryable(), 409);
+
+        $approvals->assertApproved($post);
 
         $target->forceFill([
             'status' => PostTargetStatus::Pending->value,

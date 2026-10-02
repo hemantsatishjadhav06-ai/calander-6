@@ -32,12 +32,19 @@ class PostStatusRollup
             default => PostStatus::Partial,
         };
 
-        $post->status = $status;
+        $attributes = ['status' => $status->value];
 
         if (in_array($status, [PostStatus::Published, PostStatus::Partial], true) && $post->published_at === null) {
-            $post->published_at = Date::now();
+            $attributes['published_at'] = Date::now();
         }
 
-        $post->save();
+        Post::query()
+            ->withoutGlobalScopes()
+            ->whereKey($post->id)
+            ->where('status', '!=', PostStatus::Deleted->value)
+            ->whereNull('deleted_at')
+            ->update($attributes);
+
+        $post->refresh();
     }
 }

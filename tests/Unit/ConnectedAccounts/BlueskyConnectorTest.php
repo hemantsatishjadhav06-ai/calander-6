@@ -2,15 +2,29 @@
 
 use App\Enums\Platform;
 use App\Services\ConnectedAccounts\BlueskyConnector;
-use Illuminate\Http\Client\Factory as HttpFactory;
+use App\Support\PublicHttpUrl;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakePublicHttpUrl;
+
+beforeEach(function () {
+    app()->instance(PublicHttpUrl::class, new FakePublicHttpUrl);
+});
 
 function connector(): BlueskyConnector
 {
-    return new BlueskyConnector(app(HttpFactory::class));
+    return app(BlueskyConnector::class);
 }
 
-test('resolvePds uses a manual override verbatim, normalized', function () {
+test('resolvePds accepts a normalized override authorized by the canonical did', function () {
+    Http::fake([
+        '*xrpc/com.atproto.identity.resolveHandle*' => Http::response(['did' => 'did:plc:abc']),
+        'https://plc.directory/did:plc:abc' => Http::response([
+            'id' => 'did:plc:abc',
+            'service' => [['id' => '#atproto_pds', 'type' => 'AtprotoPersonalDataServer', 'serviceEndpoint' => 'https://pds.example.com']],
+        ]),
+    ]);
+
     expect(connector()->resolvePds('ada.example.com', 'https://pds.example.com/'))
         ->toBe('https://pds.example.com');
 });
@@ -31,6 +45,7 @@ test('resolvePds resolves the handle to its DID and PDS service endpoint', funct
     Http::fake([
         '*xrpc/com.atproto.identity.resolveHandle*' => Http::response(['did' => 'did:plc:abc']),
         '*plc.directory/did:plc:abc' => Http::response([
+            'id' => 'did:plc:abc',
             'service' => [
                 ['id' => '#atproto_pds', 'type' => 'AtprotoPersonalDataServer', 'serviceEndpoint' => 'https://pds.host'],
             ],
@@ -74,4 +89,11 @@ test('connect creates a session and returns a dto with the app password and sess
         ->and($data->authMethod)->toBe('app_password')
         ->and($data->appPassword)->toBe('app-pass-1234')
         ->and($data->session)->toMatchArray(['accessJwt' => 'access-jwt', 'refreshJwt' => 'refresh-jwt']);
+});
+
+test('connect reports a session connection failure safely', function () {
+    Http::fake(fn () => throw new ConnectionException('Sensitive transport details.'));
+
+    expect(fn () => connector()->connect('ada.bsky.social', 'app-password', 'https://bsky.social'))
+        ->toThrow(RuntimeException::class, 'Could not reach the Bluesky server.');
 });

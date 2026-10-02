@@ -24,7 +24,7 @@ test('MediaProcessing re-dispatches without burning the publish attempt budget',
 
     bindConnector(PublishResult::failure(ErrorKind::MediaProcessing, 'video still processing', retryAfter: 15));
 
-    (new PublishPostTarget($target))->handle(
+    new PublishPostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),
@@ -49,7 +49,7 @@ test('MediaProcessing terminates after MAX_MEDIA_POLLS exceeded', function (): v
 
     bindConnector(PublishResult::failure(ErrorKind::MediaProcessing, 'video still processing'));
 
-    (new PublishPostTarget($target))->handle(
+    new PublishPostTarget($target)->handle(
         app(PublishConnectorRegistry::class),
         app(TokenManager::class),
         app(PostStatusRollup::class),

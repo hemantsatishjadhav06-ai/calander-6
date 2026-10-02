@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PostMedia;
 use App\Support\FileStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Context;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PostMediaContentController extends Controller
@@ -26,6 +27,9 @@ class PostMediaContentController extends Controller
      */
     public function show(Request $request, PostMedia $media): StreamedResponse
     {
+        abort_unless($media->workspace_id === Context::get('workspace_id'), 404);
+        abort_unless($request->user()?->hasAllPermissions(['workspace.read'], $media->workspace_id), 403);
+
         if ($request->query('variant') === 'source') {
             abort_if($media->source_path === null, 404);
             $disk = $media->source_disk ?? $media->disk;

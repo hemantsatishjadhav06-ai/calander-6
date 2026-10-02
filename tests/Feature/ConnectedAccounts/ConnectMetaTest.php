@@ -2,15 +2,21 @@
 
 use App\Enums\Platform;
 use App\Enums\WorkspaceRole;
+use App\Jobs\FetchAccountMessages;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\User as SocialiteUser;
+
+beforeEach(function (): void {
+    Queue::fake([FetchAccountMessages::class]);
+});
 
 function metaOwnerActingIn(): array
 {
@@ -29,6 +35,8 @@ function metaOwnerActingIn(): array
 
 function fakeFacebookOAuthUser(string $token = 'short-token'): SocialiteUser
 {
+    fakeAccountConnectionIntent('meta');
+
     $user = (new SocialiteUser)
         ->map(['id' => 'fb-user-1', 'name' => 'Ada'])
         ->setToken($token);
@@ -39,7 +47,7 @@ function fakeFacebookOAuthUser(string $token = 'short-token'): SocialiteUser
     $provider->shouldReceive('redirectUrl')->andReturnSelf();
     $provider->shouldReceive('usingGraphVersion')->andReturnSelf();
     $provider->shouldReceive('fields')->andReturnSelf();
-    $provider->shouldReceive('redirect')->andReturn(redirect('https://facebook.test/oauth'));
+    $provider->shouldReceive('redirect')->andReturn(redirect('https://facebook.test/oauth?state=test-oauth-state'));
     $provider->shouldReceive('user')->andReturn($user);
 
     Socialite::shouldReceive('driver')->with('facebook')->andReturn($provider);
@@ -87,7 +95,7 @@ test('redirect sends the user into the facebook oauth dance now that facebook is
     fakeFacebookOAuthUser();
 
     test()->get(route('accounts.meta.redirect'))
-        ->assertRedirect('https://facebook.test/oauth');
+        ->assertRedirect('https://facebook.test/oauth?state=test-oauth-state');
 });
 
 test('callback stashes assets server-side and renders a browser-safe projection', function () {
@@ -95,7 +103,7 @@ test('callback stashes assets server-side and renders a browser-safe projection'
     fakeFacebookOAuthUser();
     fakeMetaGraphResponses();
 
-    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code']))
+    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code', 'state' => 'test-oauth-state']))
         // The `accounts/connect-meta` selection screen is a frontend page a
         // later task builds; the backend contract this test proves (component
         // name + browser-safe projection shape) doesn't depend on that file
@@ -120,14 +128,15 @@ test('callback stashes assets server-side and renders a browser-safe projection'
         ->and($stash['assets']['PAGE1']['pageAccessToken'])->toBe('PGT1')
         ->and($stash['assets']['PAGE1']['pageName'])->toBe('My Page');
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/oauth/access_token')
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/oauth/access_token')
         && $request['fb_exchange_token'] === 'short-token');
 });
 
 test('callback surfaces a friendly message when facebook denies the connection', function () {
     metaOwnerActingIn();
+    fakeAccountConnectionIntent('meta');
 
-    test()->get(route('accounts.meta.callback', ['error' => 'access_denied']))
+    test()->get(route('accounts.meta.callback', ['error' => 'access_denied', 'state' => 'test-oauth-state']))
         ->assertRedirect(route('accounts.index'))
         ->assertSessionHas('error', fn (string $message): bool => str_contains($message, 'declined'));
 
@@ -139,14 +148,14 @@ test('callback reuses an existing stash when Facebook hits the callback twice wi
     fakeFacebookOAuthUser();
     fakeMetaGraphResponses();
 
-    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code']))
+    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code', 'state' => 'test-oauth-state']))
         ->assertInertia(fn (Assert $page) => $page
             ->component('accounts/connect-meta', false)
             ->has('assets', 1)
         );
 
     // Second hit (no Socialite mock needed): stash already present → picker again, no error.
-    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code']))
+    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code', 'state' => 'test-oauth-state']))
         ->assertInertia(fn (Assert $page) => $page
             ->component('accounts/connect-meta', false)
             ->has('assets', 1)
@@ -164,7 +173,7 @@ test('callback surfaces a friendly message when the graph api fails', function (
         '*/oauth/access_token*' => Http::response(['error' => ['message' => 'rate limited']], 429),
     ]);
 
-    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code']))
+    test()->get(route('accounts.meta.callback', ['code' => 'fb-auth-code', 'state' => 'test-oauth-state']))
         ->assertRedirect(route('accounts.index'))
         ->assertSessionHas('error', fn (string $message): bool => str_contains($message, "couldn't connect")
             || str_contains($message, "couldn't retrieve"));
@@ -177,6 +186,7 @@ test('store rejects instagram for a page with no linked instagram account', func
     metaOwnerActingIn();
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [
             'PAGE1' => [
                 'pageId' => 'PAGE1',
@@ -203,6 +213,7 @@ test('store creates a facebook connected account now that facebook is launched',
     metaOwnerActingIn();
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [
             'PAGE1' => [
                 'pageId' => 'PAGE1',
@@ -232,6 +243,7 @@ test('store creates an instagram connected account now that instagram is launche
     metaOwnerActingIn();
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [
             'PAGE1' => [
                 'pageId' => 'PAGE1',
@@ -262,6 +274,7 @@ test('store rejects a threads selection since threads never uses the shared meta
     metaOwnerActingIn();
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [
             'PAGE1' => [
                 'pageId' => 'PAGE1',
@@ -286,6 +299,7 @@ test('store rejects an unknown asset key', function () {
     metaOwnerActingIn();
 
     test()->withSession(['accounts.meta.connect' => [
+        'connection_intent' => fakeAccountConnectionIntent('meta'),
         'assets' => [],
         'userTokenExpiresAt' => null,
     ]])->post(route('accounts.meta.store'), [

@@ -40,7 +40,7 @@ test('facebook creates a text post and returns the pageid_postid', function () {
     expect($result->isSuccessful())->toBeTrue()
         ->and($result->remoteIds)->toBe(['page123_555']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/page123/feed')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/page123/feed')
         && $request['message'] === 'hello world');
 });
 
@@ -51,7 +51,7 @@ test('facebook includes a link field when the text contains a url', function () 
 
     app(FacebookConnector::class)->publish(fbContext(['check this out https://example.com/post']));
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/page123/feed')
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/page123/feed')
         && $request['link'] === 'https://example.com/post');
 });
 
@@ -75,7 +75,7 @@ test('facebook publishes a single photo and returns the post_id', function () {
         ->and($result->remoteIds)->toBe(['page123_777']);
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), '/page123/photos')) {
+        if (! str_contains((string) $request->url(), '/page123/photos')) {
             return false;
         }
 
@@ -108,14 +108,14 @@ test('facebook uploads a carousel of photos then posts attached_media to the fee
         ->and($result->remoteIds)->toBe(['page123_888']);
 
     // Both unpublished uploads went to /photos with published=false&temporary=true.
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/page123/photos')
-        && str_contains($request->url(), 'published=false')
-        && str_contains($request->url(), 'temporary=true'));
+    Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/page123/photos')
+        && str_contains((string) $request->url(), 'published=false')
+        && str_contains((string) $request->url(), 'temporary=true'));
 
     Http::assertSentCount(3);
 
     Http::assertSent(function ($request) {
-        if (! str_contains($request->url(), '/page123/feed')) {
+        if (! str_contains((string) $request->url(), '/page123/feed')) {
             return false;
         }
 

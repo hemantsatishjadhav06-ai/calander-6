@@ -7,6 +7,7 @@ namespace App\Support;
 use App\Models\Post;
 use App\Models\PostMedia;
 use App\Models\PostTarget;
+use App\Services\Posts\PostApprovalService;
 
 final class PostListItem
 {
@@ -19,6 +20,7 @@ final class PostListItem
             'id' => $post->id,
             'base_text' => $post->base_text,
             'status' => $post->status->value,
+            'approval' => app(PostApprovalService::class)->toView($post, request()->user()),
             'status_label' => $post->status->label(),
             'author' => $post->author?->name,
             'target_count' => $post->targets->count(),

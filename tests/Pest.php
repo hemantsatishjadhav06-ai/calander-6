@@ -18,6 +18,7 @@ use App\Services\Publishing\Contracts\PublishConnector;
 use App\Services\Publishing\PublishConnectorRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Laravel\Passport\AccessToken;
 use Laravel\Passport\Client;
@@ -28,6 +29,12 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
 
 ini_set('memory_limit', '512M');
+
+require_once __DIR__.'/Support/FakeDns.php';
+
+beforeEach(function (): void {
+    Http::fake([])->preventStrayRequests();
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -155,7 +162,7 @@ function bindConnector(PublishResult|callable $result): void
 
     app()->instance(PublishConnectorRegistry::class, new class($connector) extends PublishConnectorRegistry
     {
-        public function __construct(private PublishConnector $connector) {}
+        public function __construct(private readonly PublishConnector $connector) {}
 
         public function for(Platform $platform): PublishConnector
         {
@@ -250,6 +257,8 @@ function ownerActingIn(): array
  */
 function fakeOAuthUser(string $driver, array $data): SocialiteUser
 {
+    fakeAccountConnectionIntent($driver === 'linkedin-openid' ? 'linkedin' : $driver);
+
     $user = (new SocialiteUser)
         ->map([
             'id' => $data['id'],
@@ -274,10 +283,26 @@ function fakeOAuthUser(string $driver, array $data): SocialiteUser
     $provider = Mockery::mock(AbstractProvider::class);
     $provider->shouldReceive('setScopes')->andReturnSelf();
     $provider->shouldReceive('redirectUrl')->andReturnSelf();
-    $provider->shouldReceive('redirect')->andReturn(redirect('https://provider.test/oauth'));
+    $provider->shouldReceive('redirect')->andReturn(redirect('https://provider.test/oauth?state=test-oauth-state'));
     $provider->shouldReceive('user')->andReturn($user);
 
     Socialite::shouldReceive('driver')->with($driver)->andReturn($provider);
 
     return $user;
+}
+
+/** @return array{user_id: string, workspace_id: string, state: string, created_at: int} */
+function fakeAccountConnectionIntent(string $flow, string $state = 'test-oauth-state'): array
+{
+    /** @var User $user */
+    $user = auth()->user();
+    $intent = [
+        'user_id' => (string) $user->id,
+        'workspace_id' => (string) $user->current_workspace_id,
+        'state' => $state,
+        'created_at' => now()->getTimestamp(),
+    ];
+    session()->put('accounts.connection_intents.'.$flow, $intent);
+
+    return $intent;
 }
