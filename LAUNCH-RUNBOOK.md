@@ -1,16 +1,28 @@
 # SM Manager — launch runbook
 
-Updated 2026-10-02 for `hemantsatishjadhav06-ai/calander-6`, starting from
-commit `98f2758`. This audit covers the working tree, automated tests, local
-browser flows, and deployment configuration. It does not certify a running
-production deployment. No production configuration, accounts, or posts were
-changed during this audit.
+Updated 2026-10-02 for `hemantsatishjadhav06-ai/calander-6`. The tested release
+candidate is `aff741882ca8379b438707043c711c043307f638` (PR #12), based on the
+existing production commit `98f2758`. Authenticated provider inspection,
+database recovery checks, the production image, and normal live account login
+have been verified. Railway rollout and the new owner's live brand setup are
+still pending at this revision of the runbook. Update the status table after
+release acceptance; a passing candidate is not evidence that production is
+already running it.
 
-The local quality gate, test suites, and production asset builds pass. Public
-launch additionally needs durable storage, recovery, working email, and real
-provider smoke tests. The default release configuration assumes free access
-(`SELF_HOSTED=true`). Subscription billing needs a separate configured Stripe
-release.
+| Area | Verified status on 2026-10-02 | Remaining acceptance |
+| --- | --- | --- |
+| SM Manager | Existing Railway app is reachable; the requested account was created and normal password login reached `/dashboard`. | Deploy the tested release, prepare both owner workspaces, and verify the live private approval flows. |
+| Release candidate | Production image boots with 48 migrations, SSR and non-root web/background processes; PostgreSQL 18 migration and data-preservation checks pass. | Verify the same behavior against Railway's new persistent app volume. |
+| Recovery | Native PostgreSQL manual backup exists, daily/weekly/monthly schedules are enabled, and a verified private `pg_dump` 18 backup was restored into an isolated test database. | Record the deployed app volume and verify media/key persistence after a redeploy. |
+| Website publication | Explicit approved-version Netlify publisher is implemented for the exact owner and both verified sites; its token is configured securely in Railway. | Enable the release flags, verify live availability and private denial cases, then publish only content approved by the owner. |
+| More Space website | Asset and public cost-calculator fixes are live in deploy `6abfc68e0eb1201f79094d0b`. | The contact/WhatsApp fallback fix in website PR #4 is tested but not yet live. Replace the unavailable Supabase backend. |
+| Social providers | Confirmed brand identities are recorded. An existing X account belongs to a different workspace and is preserved. | Configure the Meta app, obtain official owner consent in each workspace, and create More Space's X account. |
+| Email | Production currently uses the log mailer. | Configure a delivery service and prove reset, verification and invitation delivery. |
+
+The intended release uses free self-hosted access (`SELF_HOSTED=true`).
+Subscription billing requires a separately configured and tested Stripe
+release. Private testing can proceed after rollout; public launch still needs
+the remaining provider, email, persistence and website-backend checks.
 
 ## Brand setup and content review
 
@@ -36,56 +48,91 @@ Blog authoring, SEO fields, private preview, review, approval and rejection
 are implemented. Preview responses require workspace access and use no-store
 and noindex. Blog text is escaped; preview does not fetch remote images.
 Slugs are unique within each workspace, with validation inside the workspace
-lock and a database constraint. Website publication is unavailable until the
-real Netlify site/repository binding and a supported publication adapter are
-verified. Approval alone never deploys an article.
+lock and a database constraint. Approval alone keeps the article private.
+The owner must separately choose **Publish approved version** to queue a
+website deployment.
+
+The Netlify publisher checks the approved revision, owner email, site ID and
+website URL before creating a full-site draft deployment. It preserves the
+current file manifest, existing blogs and hidden configuration, verifies the
+immutable article preview and complete deployed manifest, then checks the
+approval and live-site state again before promotion. Shared site locks and
+persisted recovery state handle retries and interrupted deployment attempts.
+Unsupported functions, edge functions or compiled configuration fail closed.
+Netlify does not expose an atomic conditional promotion; a separate operator
+forcing a deploy can race the final promotion. Reconcile that remote state
+before retrying an ambiguous outcome.
+
+Publication requires `BLOG_PUBLISHING_ENABLED=true`,
+`BLOG_PUBLISHING_OWNER_EMAIL=neopolisinfrallp3@gmail.com` and the securely
+configured `NETLIFY_AUTH_TOKEN`. The allowlist is in `config/blogs.php`:
+
+| Brand | Website / Netlify site ID | Confirmed social identities |
+| --- | --- | --- |
+| Neopolis | https://neopolisinfra.com · `47e0a5cc-d9d9-428b-a36b-beea806bff6f` | Instagram `@neopolis_infra`; Facebook Page `61595008380228`; X `@neopolisinfra` |
+| More Space | https://morespace.netlify.app · `964e086b-1cf2-47f7-8b78-16909d268319` | Instagram `@morespace.ai`; Facebook Page `585141221346435`; X account still to be created |
+
+The requested owner and sole draft approver is
+`neopolisinfrallp3@gmail.com`. The new account has passed normal live sign-in;
+the release must still prepare and verify its separate brand workspaces.
+Keep setup links, passwords, cookies and provider secrets outside this file.
 
 OAuth connection intents now bind the initiating session, user and workspace;
 switching brands during authorization cannot attach credentials to another
 workspace. Bluesky account connections verify the DID's canonical PDS before
 accepting credentials.
 
-Read-only checks on 2026-10-02 found HTTP 200 at the existing manager's `/up`
-and `/login`, and both brand websites. GitHub's successful Railway deployment
-record still refers to `98f2758`; these new changes were not deployed during
-this work. Neopolis's live homepage matches the repository
-`hemantsatishjadhav06-ai/hemantsatishjadhav06-ai.github.io`, which contains
-static blog pages. More Space's likely source is
-`hemantsatishjadhav06-ai/morespace-website`; its actual Netlify binding remains
-unverified. Neopolis's single-file builder omits blogs, so an adapter must
-preserve the complete site tree.
+Both sites are verified manual/static Netlify deployments. A GitHub merge
+does not establish an automatic Netlify release. Neopolis's current full tree
+contains existing blogs and project pages; preserve the complete manifest
+rather than using its single-file homepage builder. More Space's source is
+`hemantsatishjadhav06-ai/morespace-website`. Website PR #3 is merged and its
+asset/calculator release is live; PR #4 contains the tested enquiry fallback.
 
-Management credentials remain unavailable. Secure cloud environment
-requirements were saved for `RAILWAY_TOKEN` (production project token,
-`Project-Access-Token` header at `backboard.railway.com`) and
-`NETLIFY_AUTH_TOKEN` (Bearer token at `api.netlify.com`). Enter values in
-environment settings, then verify backups, stable keys, persistent storage,
-current deployment settings and exact site bindings before release. The
-user must complete provider verification/sign-in where required. More Space's
-X account still needs creation. No new live account connections, messages,
-posts or blogs were published.
+More Space's configured backend hostname,
+`aszxypvnndlzzdmzwkrr.supabase.co`, returns NXDOMAIN through both Google and
+Cloudflare DNS-over-HTTPS and fails DNS lookup from Railway. This is a missing
+backend, not proof of a browser allowlist problem. Database-driven inventory,
+saved enquiries and backend-dependent chat need a current project or a
+replacement backend. Static website content, the cost calculator and
+WhatsApp navigation remain usable. The PR #4 fallback preserves the complete
+encoded enquiry and offers a persistent WhatsApp link when saving or opening
+a popup fails; opening WhatsApp does not itself send the enquiry.
+
+The supplied provider credentials now work through authenticated official
+APIs. This Railway account token uses `Authorization: Bearer` at
+`backboard.railway.com/graphql/v2`; Netlify uses Bearer authentication at
+`api.netlify.com`. Tokens are handled outside repository files and logs.
+The user must still complete real provider verification and consent where
+required. No new social connections, messages, posts or blog articles have
+been publicly published during these checks.
 
 ## Target and verified scope
 
-The previous runbook identified this Railway deployment. Public health and
-GitHub's existing successful deployment record were rechecked on 2026-10-02.
-Its current settings,
-credentials, volumes, backups, quotas, and worker processes were not accessible
-for verification in this environment. Treat these as deployment references,
-not current-state assertions.
+Authenticated Railway inspection on 2026-10-02 verified the production
+project, service, environment, running instance, variables and PostgreSQL
+volume. The existing app still runs `98f2758` and has no durable app storage
+volume at this checkpoint. Git auto-deploy was temporarily disabled to
+control the authorized rollout; restore its prior enabled state after the
+tested release is stable.
 
 | Item | Reference |
 | --- | --- |
-| Existing app | https://sm-manager-production-33df.up.railway.app |
+| Live app | https://sm-manager-production-33df.up.railway.app |
 | Repository | `hemantsatishjadhav06-ai/calander-6` |
 | Railway project | `5b228b66-e948-4243-bf3d-a3b7cdc9a518` |
 | Railway service | `sm-manager` · `4718225a-e77f-422c-8b38-8ae82b69e936` |
 | Environment | `production` · `b5642ba0-de22-4c2f-b9b0-295354d33114` |
+| Existing deployment | `8801cdcf-9b7f-402e-9486-35481ad49611` · commit `98f2758` |
+| PostgreSQL service | `83de65fc-66de-41f5-b247-91388b9888cf` · PostgreSQL 18 |
+| Pre-release native database backup | `3311d5a9-0696-4d69-a9b8-af2aa5231db8` |
 
-Local checks use PHP 8.5, Laravel 13, Bun 1.4.2, SQLite, and isolated test
-accounts. Live Google, X, LinkedIn, Meta, Threads, Bluesky, mail, Stripe, and S3
-requests were not used to prove provider behavior; connector tests use HTTP
-fixtures. PostgreSQL deployment behavior still needs staging validation.
+Local checks use PHP 8.5, Laravel 13, Bun 1.4.2, SQLite and isolated accounts.
+The actual PostgreSQL 18 backup also passed isolated migration and queue
+checks. Real authenticated Railway/Netlify API contracts and normal live SM
+Manager login were exercised. Google, X, LinkedIn, Meta, Threads, Bluesky,
+mail, Stripe and S3 publication behavior still needs provider-specific live
+acceptance; fixture tests do not establish consent, quotas or delivery.
 
 ## Audit findings addressed
 
@@ -118,55 +165,55 @@ and reconcile remote outcomes before manually retrying them.
 
 ## Verification record
 
-Validation on 2026-10-02 covers the integrated audit, approval, brand and blog
-changes. The repository uses Pest, Bun, oxlint, oxfmt, Pint, Larastan, and Rector.
+Validation on 2026-10-02 covers the final audit, approval, brand setup, real
+Netlify publisher and deployment runtime. The repository uses Pest, Bun,
+oxlint, oxfmt, Pint, Larastan and Rector.
 
-- Full `composer ci:check`: passed after integration,
-  including frontend lint/format/types, Rector, all 955 PHP files checked by Pint,
-  Larastan, and Pest.
-- PHP suite: 2,278 tests passed with 9,266 assertions.
-- Frontend suite: 1,010 tests passed across 152 files.
-- Full Larastan analysis: no errors.
-- Frontend types, lint, and formatting: passed.
-- Client and SSR production asset builds: passed.
-- Composer and Bun vulnerability audits: no known advisories in the updated
-  dependency graphs at audit time. This does not predict future advisories.
-- Browser: an isolated application using production assets passed 15 desktop
-  visits and nine mobile routes at 390 px. Registration, both brand mappings,
-  private starter drafts, workspace switching, and blog approval/edit/save/
-  rejection passed with no uncaught JavaScript errors, same-origin HTTP errors
-  or horizontal overflow. The database contained 14 private planned posts,
-  two blogs, zero connected accounts, zero queued jobs and zero published posts.
-  Optional DiceBear requests were blocked; follow-up component tests verify
-  initials fallback for failed avatar loads. The earlier audit also verified
-  denied browser storage and draft autosave/reopening.
-- Seven production configuration tests passed, covering initialization,
-  environment, SMTP,
-  graceful shutdown, and non-root Supervisor permissions; shell syntax, Compose
-  configuration, and a real Docker build-context exclusion probe passed.
+- The full integrated `composer ci:check` passed with 2,311 PHP tests and
+  9,454 assertions, Pint checking 962 files, Larastan, Rector and frontend
+  lint/format/types. Later focused publisher recovery cases also passed.
+- All GitHub CI checks passed for final runtime commit `aff7418`, including
+  tests, quality/static analysis, dependency audit and security scans.
+- The final frontend suite passed 1,020 tests across 152 files.
+- The final blog publisher suite passed 61 tests and 561 assertions, including
+  actual Netlify response contracts, approval checks and interrupted recovery.
+- Final deployment regression checks passed 15 tests and 49 assertions;
+  shell syntax, Pint and Rector checks passed.
+- An isolated restore of the real PostgreSQL 18 backup migrated from 43 to 48
+  migrations. All 44 original data-table row counts and original-column
+  checksums were preserved. Focused PostgreSQL approval, scheduling and
+  publisher checks passed 245 tests and 1,450 assertions. Native database
+  queue claim/release/delete checks passed without running publication jobs.
+- The isolated browser application passed desktop/mobile registration, brand
+  setup, workspace switching and private blog review/edit/rejection flows.
+  Its starter data contained 14 private posts, two blogs, zero publication
+  jobs and zero published posts. The new live owner separately passed normal
+  HTTP sign-in; live post-rollout browser acceptance is still pending.
+- More Space's first immutable preview and live release passed desktop/mobile
+  home and calculator checks, asset checks, reload, six exact math fixtures,
+  invalid-input/CSV formula cases and one-page A4 print. The separate PR #4
+  candidate passed desktop/mobile mocked failure and success checks without
+  submitting real enquiries or navigating WhatsApp.
 
-The 2026-10-01 audit baseline's full Linux AMD64 Dockerfile recipe built
-successfully, including
-production dependencies, runtime extensions, Wayfinder, client/SSR assets,
-and package discovery. Validation used a disposable overlayfs builder,
-verified local official Bun OCI content, a cloud proxy host mapping, and the
-host's trusted CA as a temporary per-build-step secret. Certificate and
-checksum verification stayed enabled; the tracked Dockerfile was not changed
-for these environment adjustments. The original VFS daemon exceeded its disk
-capacity, and registry requests hit rate limits before those workarounds.
-The candidate image was exported for validation and removed after checks.
-It was never published or deployed.
-Its actual entrypoint applied all 44 SQLite migrations, cached configuration,
-routes, events, and views, and started supervised Octane, the queue worker,
-scheduler, and Bun SSR. HTTP `/up` and SSR `/health` passed; `/login` contained
-server-rendered controls. Runtime bcmath, cURL, EXIF, GD with WebP, SQLite,
-PostgreSQL PDO, Redis, ffmpeg, and ffprobe checks passed. The boot check used a
-separate disposable stage with synthetic configuration and no provider calls;
-those fixtures are absent from the exported application image.
-The newer approval, brand and blog code passed the 2026-10-02 checks above,
-including client/SSR builds, but requires a new production image build.
-Production platform configuration and live integrations still require the
-release acceptance checks below; the baseline image does not prove them.
+The full Linux AMD64 Dockerfile recipe for `aff7418` built and booted with
+production dependencies, client/SSR assets and signed PostgreSQL client 18.6
+packages. Its actual entrypoint prepared a fresh root-owned storage volume,
+preserved private file modes, dropped privileges and started Octane, the queue
+worker, scheduler and Bun SSR as UID 9999 with `NoNewPrivs=1`. Console FIFO
+ownership was verified without changing its `0600` mode. All 48 migrations,
+production caches, HTTP `/up`, SSR `/health` and server-rendered `/login`
+passed. The image defaults to `www-data`; Railway's root-start wrapper is
+used only to prepare the mounted volume before application initialization.
+
+The final image manifest is
+`sha256:6ee78c4bcd2e5265bbdac164af71583bbf08de9dd0661055d7578b6a9e1dca0f`.
+All 1,567 tracked files and 1,038 critical runtime files matched the source;
+38 OCI blobs were verified. No synthetic fixtures, credentials, proxy CA or
+uploaded media were included. Registry rate limits were handled with verified
+official Bun OCI content and a temporary build-step CA secret; TLS, package
+signatures and checksums remained enabled. The candidate was not published
+as a registry artifact by this validation. Railway rollout must still prove
+the live service, persistent volume and configured integrations.
 
 The previous Rector gate proposed 159 files of modernization changes. These
 were reviewed and applied in scoped application/test batches. One unsafe suggestion was
@@ -188,6 +235,8 @@ SESSION_SECURE_COOKIE=true
 ALLOW_DEFAULT_USER_SEED=false
 SELF_HOSTED=true
 QUEUE_CONNECTION=database
+BLOG_PUBLISHING_ENABLED=true
+BLOG_PUBLISHING_OWNER_EMAIL=neopolisinfrallp3@gmail.com
 ```
 
 Set `OCTANE_HTTPS=true` behind a TLS terminating proxy. Set `TRUSTED_PROXIES` to
@@ -206,19 +255,36 @@ platform must supply equivalent persistence or managed services.
 For object storage set `FILESYSTEM_DISK=s3`, bucket, region, credentials, and
 endpoint as needed. Video direct uploads require bucket CORS to allow `PUT`
 from `APP_URL` and expose `ETag`; expire `tmp/media/` objects after about a day.
-For disk storage use `FILESYSTEM_DISK=public` with persistent storage and the
-storage symlink. Verify an image and video still render after a redeploy.
+For the inspected Railway deployment, preserve its current default local
+disk and mount the entire `/var/www/html/storage` tree. That retains both
+private and public data; do not switch the default disk to public merely to
+make uploads persistent. Verify the storage symlink and that uploaded images,
+videos and disk-generated Passport keys survive a redeploy.
 
-Enable scheduled database backups with retention and restore one into a
-scratch database. Record the recovery steps and who can execute them. Test the
-new migrations on the actual database engine before releasing to production.
+Set Railway `RAILWAY_RUN_UID=0` for the first root-owned volume. The tested
+entrypoint prepares storage/cache ownership and its own console descriptors,
+then drops to `www-data` before migrations, caches and application processes.
+Keep one replica and one active scheduler while using this shared disk.
+Leave `APP_KEY` unchanged. Generate Passport keys once if absent and retain
+them on the persistent volume; never force-overwrite an existing pair.
+
+PostgreSQL already has a persistent volume. Native daily, weekly and monthly
+backup schedules are enabled, and manual backup
+`3311d5a9-0696-4d69-a9b8-af2aa5231db8` was verified. An owner-only custom-format
+`pg_dump` 18 backup was downloaded with its SHA-256 verified and restored into
+an isolated PostgreSQL 18 instance for the migration/data-preservation checks.
+The final runtime includes signed PostgreSQL 18 client tools for future
+backups. Configure app-volume backups after creation, record the recovery
+operator and retention, and preserve the private database backup securely.
 
 ### Outbound email
 
 A log/array mailer delivers no password resets, invites, or notifications.
 Configuring a delivery mailer also enables email verification. Configure the
 provider and an authorized sender, then prove verification, password reset,
-and a workspace invitation arrive in real inboxes.
+and a workspace invitation arrive in real inboxes. The inspected live service
+currently uses `MAIL_MAILER=log`; normal login works, but inbox delivery has
+not been proved.
 
 ```dotenv
 MAIL_MAILER=smtp
@@ -244,6 +310,16 @@ connected-account callbacks use `/accounts/callback/{provider}`. Meta uses
 with the same provider app. Configure the final domain before registering
 callbacks to avoid repeating provider setup.
 
+Meta credentials and owner consent are still missing. Supply the Meta App ID
+and configure its secret securely in Railway (`FACEBOOK_CLIENT_ID` and
+`FACEBOOK_CLIENT_SECRET`); Facebook and Instagram use the unified Meta
+callback above and Instagram accounts must be linked to the correct Pages.
+Follow the official provider screens and obtain the permissions required for
+each enabled feature. The existing X connection in another workspace is not
+evidence that these new owner workspaces are connected; reconnect through the
+owner's consent flow without moving another user's credentials. More Space
+also needs an X account created before its consent flow can run.
+
 For each advertised platform, connect a launch test account and exercise a
 text post, image, video where supported, future schedule, token refresh, retry,
 and remote deletion. Confirm one remote result and correct local status. Also
@@ -259,30 +335,42 @@ service. The audit does not decide the legal entity or certify legal terms.
 
 ## Release sequence and acceptance checks
 
-1. Run all local gates with the frozen lockfiles, then build the production
-   image on a builder with sufficient disk and registry access.
-2. Test that image against persistent staging storage and the production
-   database engine. Verify `/up`, frontend assets, media conversion, scheduler,
-   worker, and SSR if enabled. Keep one active scheduler per deployment.
-3. Back up production and restore a backup into a scratch database. Preserve
-   the current image, configuration, `APP_KEY`, and Passport keys for rollback.
-4. Pause publication endpoints, producers, workers and scheduler while replacing
-   pre-approval code. Apply `php artisan migrate --force --no-interaction`
-   before routing traffic to the new release. The four additive migrations add
-   the nullable, unique MCP `authorization_code_hash`, workspace/post approval
-   fields, `brand_profiles`, and `blog_drafts`. Existing token bindings remain
-   usable; in-progress pre-upgrade consent codes may need new consent.
-5. Deploy the tested image and restart Octane, queue workers, and scheduler so
-   they load the new code. Allow up to 16 minutes for active video publication
-   jobs to finish; verify the hosting platform supports that grace period.
-6. Confirm approval enforcement before resuming publication. Confirm HTTPS
-   `/up`, public pages, signup/sign-in, workspace isolation,
-   actual mail delivery, media persistence, MCP consent/refresh, and one real
-   scheduled publication on every advertised platform. Observe workers and
-   scheduler logs, queue backlog, failures, and provider quotas.
-7. Open public registration and announce the service only after these checks
-   pass. A merge may auto-deploy on the existing platform: verify its release
-   trigger before merging.
+1. Confirm the passing final CI head and production-image proof. Preserve the
+   current image, configuration, `APP_KEY`, database backup and any existing
+   Passport keys. Git auto-deploy is temporarily disabled for this rollout.
+2. Merge the tested candidate, verify the merged runtime tree, and prepare
+   production variables without triggering an unintended old-code deploy.
+   Keep `QUEUE_WORKER_ENABLED=false` and `SCHEDULER_ENABLED=false` for initial
+   private acceptance. Preserve the current database and filesystem settings.
+3. Create the durable app volume at `/var/www/html/storage` and deploy the exact
+   tested commit. Apply `php artisan migrate --force --no-interaction` before
+   routing traffic. The five additive migrations take the old 43-migration
+   schema to 48: MCP authorization binding, social approval, brand profiles,
+   private blog drafts and website-publication recovery. Existing token
+   bindings remain usable; unfinished old consent codes may need new consent.
+4. Verify the running release, 48 migrations, volume ownership, non-root web/
+   background processes, HTTPS `/up`, frontend assets, SSR and normal sign-in.
+   Prepare the new owner's two brand workspaces through the normal setup flow;
+   verify confirmed mappings, 14 private posts, two private blogs, owner-only
+   approval and no new publication jobs or public content.
+5. Run live desktop/mobile private acceptance: workspace isolation, draft
+   saves, review, approval followed by edit invalidation, unapproved publish
+   denial and the configured website publisher's availability. Do not use a
+   public post or blog as an unapproved smoke test.
+6. Enable the worker and single scheduler after those checks, restart so they
+   load the final code/configuration, and verify stable keys and media after
+   redeployment. Configure app-volume backup schedules and take a post-setup
+   recovery checkpoint. Permit active publication jobs to drain before later
+   replacement; the tested Supervisor grace period supports long video jobs.
+7. Restore the prior Git auto-deploy setting after the stable release and
+   update this runbook's release/status rows with actual deployment evidence.
+   Finish mail delivery, the More Space backend replacement and official
+   account consent. After dashboard approval, exercise a real scheduled
+   publication on each advertised provider and confirm the remote result,
+   local status, refresh/retry/deletion, scopes and quotas.
+8. Open public registration and announce the service only after public-launch
+   checks pass. Record the actual instance registration policy; environment
+   values alone may be overridden by saved instance settings.
 
 Rollback uses a retained image and stable secrets while preserving persistent
 volumes, additive schema and approval data. A pre-approval image ignores
