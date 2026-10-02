@@ -98,14 +98,17 @@ test('supervisor allows a publishing job to finish during a deployment', functio
     expect((int) ($gracePeriod[1] ?? 0))->toBeGreaterThan((new PublishPostTarget(PostTarget::factory()->make()))->timeout);
 });
 
-function containerEntrypointProcess(string $directory, string $userId, array $environment = []): Process
+function containerEntrypointProcess(string $directory, string $userId, array $environment = [], bool $outputToFiles = false): Process
 {
     $bin = $directory.'/bin';
     File::makeDirectory($bin);
 
     $commands = [
         'id' => 'printf "%s\\n" "$SM_ENTRYPOINT_TEST_UID"',
-        'chown' => 'if [ "${SM_ENTRYPOINT_TEST_CHOWN_FAILURE:-false}" = "true" ]; then exit 17; fi',
+        'chown' => <<<'SH'
+if [ "${SM_ENTRYPOINT_TEST_CHOWN_FAILURE:-false}" = "true" ]; then exit 17; fi
+printf '%s\n' "$@" >> "$SM_ENTRYPOINT_TEST_DIRECTORY/ownership-arguments"
+SH,
         'setpriv' => <<<'SH'
 printf '%s\n' "$@" > "$SM_ENTRYPOINT_TEST_DIRECTORY/privilege-arguments"
 while [ "$1" != "--" ]; do shift; done
@@ -123,8 +126,12 @@ SH,
         chmod($path, 0755);
     }
 
+    $command = $outputToFiles
+        ? ['sh', '-c', 'exec sh "$1" php "argument with spaces" --flag >"$2" 2>"$3"', 'entrypoint-fixture', base_path('docker/entrypoint.sh'), $directory.'/stdout', $directory.'/stderr']
+        : ['sh', base_path('docker/entrypoint.sh'), 'php', 'argument with spaces', '--flag'];
+
     return new Process(
-        ['sh', base_path('docker/entrypoint.sh'), 'php', 'argument with spaces', '--flag'],
+        $command,
         $directory,
         [
             'PATH' => $bin.':'.getenv('PATH'),
@@ -162,6 +169,31 @@ test('non-root container startup forwards the command without changing volume ow
     expect($process->getOutput())->toBe("php\nargument with spaces\n--flag\n")
         ->and(is_dir($this->deploymentDirectory.'/app'))->toBeFalse()
         ->and(is_file($this->deploymentDirectory.'/privilege-arguments'))->toBeFalse();
+});
+
+test('root container startup prepares both console pipes before dropping privileges', function (): void {
+    $process = containerEntrypointProcess($this->deploymentDirectory, '0');
+    $process->mustRun();
+
+    expect(File::get($this->deploymentDirectory.'/ownership-arguments'))
+        ->toContain("/proc/self/fd/1\n", "/proc/self/fd/2\n")
+        ->and($process->getOutput())->toBe("php\nargument with spaces\n--flag\n");
+});
+
+test('root container startup leaves redirected regular console files untouched', function (): void {
+    foreach (['stdout', 'stderr'] as $name) {
+        File::put($this->deploymentDirectory.'/'.$name, '');
+        chmod($this->deploymentDirectory.'/'.$name, 0600);
+    }
+
+    $process = containerEntrypointProcess($this->deploymentDirectory, '0', outputToFiles: true);
+    $process->mustRun();
+
+    expect(File::get($this->deploymentDirectory.'/ownership-arguments'))
+        ->not->toContain('/proc/self/fd/1', '/proc/self/fd/2')
+        ->and(File::get($this->deploymentDirectory.'/stdout'))->toBe("php\nargument with spaces\n--flag\n")
+        ->and(fileperms($this->deploymentDirectory.'/stdout') & 0777)->toBe(0600)
+        ->and(fileperms($this->deploymentDirectory.'/stderr') & 0777)->toBe(0600);
 });
 
 test('root container startup fails before initialization when volume ownership cannot be prepared', function (): void {
