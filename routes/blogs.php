@@ -22,4 +22,5 @@ Route::middleware(['auth', 'verified', NoIndex::class, 'cache.headers:private;no
     Route::post('blogs/{blogDraft}/request-review', [BlogDraftController::class, 'requestReview'])->name('blogs.request-review');
     Route::post('blogs/{blogDraft}/approve', [BlogDraftController::class, 'approve'])->name('blogs.approve');
     Route::post('blogs/{blogDraft}/reject', [BlogDraftController::class, 'reject'])->name('blogs.reject');
+    Route::post('blogs/{blogDraft}/publish', [BlogDraftController::class, 'publish'])->name('blogs.publish');
 });

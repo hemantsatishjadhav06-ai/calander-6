@@ -1,7 +1,9 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePoll } from '@inertiajs/react';
+import { useEffect } from 'react';
 
 import {
     approve,
+    publish,
     reject,
     requestReview,
 } from '@/actions/App/Http/Controllers/Blogs/BlogDraftController';
@@ -17,6 +19,51 @@ import type { BlogContext, BlogDraft } from '@/types/blogs';
 type Props = BlogContext & { blog: BlogDraft };
 
 export default function BlogPreview({ blog, brand, publication }: Props) {
+    const publicationActive =
+        blog.publication_status === 'queued' ||
+        blog.publication_status === 'publishing';
+    const publishedCurrentVersion = blog.published_revision === blog.revision;
+    const canPublish =
+        publication.available &&
+        blog.can_review &&
+        blog.status === 'approved' &&
+        !publicationActive &&
+        !publishedCurrentVersion;
+    const poll = usePoll(
+        3000,
+        { only: ['blog', 'publication'] },
+        { autoStart: false },
+    );
+
+    useEffect(() => {
+        if (!publicationActive) {
+            return;
+        }
+
+        poll.start();
+
+        return () => poll.stop();
+        // oxlint-disable-next-line react-hooks/exhaustive-deps -- poll identity is stable per Inertia; publicationActive owns the polling lifecycle
+    }, [publicationActive]);
+
+    let publishedUrl: string | null = null;
+    if (blog.published_url && brand.website_url) {
+        try {
+            const url = new URL(blog.published_url);
+            const website = new URL(brand.website_url);
+            if (
+                url.protocol === 'https:' &&
+                url.origin === website.origin &&
+                !url.username &&
+                !url.password
+            ) {
+                publishedUrl = url.href;
+            }
+        } catch {
+            publishedUrl = null;
+        }
+    }
+
     return (
         <>
             <Head title={`Preview ${blog.title}`}>
@@ -32,13 +79,15 @@ export default function BlogPreview({ blog, brand, publication }: Props) {
                             {brand.name} · Version {blog.content_revision}
                         </p>
                     </div>
-                    <Button
-                        variant="outline"
-                        nativeButton={false}
-                        render={<Link href={edit(blog.id).url} />}
-                    >
-                        Edit draft
-                    </Button>
+                    {blog.publication_status !== 'publishing' && (
+                        <Button
+                            variant="outline"
+                            nativeButton={false}
+                            render={<Link href={edit(blog.id).url} />}
+                        >
+                            Edit draft
+                        </Button>
+                    )}
                 </div>
                 <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
                     <div className="min-w-0 space-y-6">
@@ -219,14 +268,88 @@ export default function BlogPreview({ blog, brand, publication }: Props) {
                                 drafts.
                             </p>
                         )}
-                        <div className="space-y-2 border-t pt-4 text-sm text-muted-foreground">
+                        <div className="space-y-3 border-t pt-4 text-sm text-muted-foreground">
                             <h3 className="font-medium text-foreground">
                                 Website publishing
                             </h3>
                             <p>{publication.reason}</p>
-                            <p>
-                                This draft is private, including after approval.
-                            </p>
+                            {publicationActive ? (
+                                <p role="status" className="text-foreground">
+                                    {blog.publication_status === 'queued'
+                                        ? 'Publishing queued. Waiting for the approved version to deploy.'
+                                        : 'Publishing the approved version to your website…'}
+                                </p>
+                            ) : publishedCurrentVersion ? (
+                                <p role="status" className="text-foreground">
+                                    This approved version is live on your
+                                    website.
+                                </p>
+                            ) : blog.published_revision ? (
+                                <p>
+                                    The previously published version remains
+                                    live. This draft stays private until you
+                                    approve and publish it.
+                                </p>
+                            ) : (
+                                <p>
+                                    Approval keeps this draft private. Only the
+                                    workspace owner can publish an approved
+                                    version.
+                                </p>
+                            )}
+                            {(blog.publication_error ||
+                                blog.publication_status === 'failed') && (
+                                <p
+                                    role="alert"
+                                    className="rounded-lg bg-muted p-3 break-words text-foreground"
+                                >
+                                    {blog.publication_error ||
+                                        'Website publishing failed. Review the connection and try again.'}
+                                </p>
+                            )}
+                            {publishedUrl && (
+                                <a
+                                    href={publishedUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block break-words text-foreground underline underline-offset-4"
+                                >
+                                    {publishedCurrentVersion
+                                        ? 'View published article'
+                                        : 'View previously published article'}
+                                </a>
+                            )}
+                            {canPublish && (
+                                <Form
+                                    key={`publish-${blog.revision}`}
+                                    {...publish.form(blog.id)}
+                                >
+                                    {({ processing, errors }) => (
+                                        <div className="space-y-2">
+                                            <input
+                                                type="hidden"
+                                                name="revision"
+                                                value={blog.revision}
+                                            />
+                                            <InputError
+                                                message={
+                                                    errors.publication ??
+                                                    errors.revision
+                                                }
+                                            />
+                                            <Button
+                                                type="submit"
+                                                disabled={processing}
+                                                className="w-full"
+                                            >
+                                                {processing
+                                                    ? 'Queuing publication…'
+                                                    : 'Publish approved version'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </Form>
+                            )}
                         </div>
                         <Link
                             href={index().url}

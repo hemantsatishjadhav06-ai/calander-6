@@ -38,6 +38,18 @@ use Override;
  * @property CarbonImmutable|null $rejected_at
  * @property string|null $rejection_reason
  * @property CarbonImmutable $updated_at
+ * @property string $publication_status
+ * @property string|null $publication_attempt_id
+ * @property string|null $publication_revision
+ * @property string|null $publication_error
+ * @property string|null $publication_deploy_id
+ * @property string|null $publication_deploy_attempt_id
+ * @property string|null $publication_url
+ * @property string|null $publication_base_deploy_id
+ * @property bool|null $publication_base_was_locked
+ * @property string|null $published_revision
+ * @property string|null $published_url
+ * @property CarbonImmutable|null $published_at
  */
 #[Fillable([
     'workspace_id', 'author_id', 'title', 'slug', 'body', 'excerpt',
@@ -49,7 +61,7 @@ class BlogDraft extends Model
     use HasFactory, HasUuids, HasWorkspaceScope;
 
     #[Override]
-    protected $attributes = ['content_revision' => 1];
+    protected $attributes = ['content_revision' => 1, 'publication_status' => 'idle'];
 
     /** @return array<string, string> */
     #[Override]
@@ -61,6 +73,8 @@ class BlogDraft extends Model
             'approved_at' => 'immutable_datetime',
             'rejected_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
+            'published_at' => 'immutable_datetime',
+            'publication_base_was_locked' => 'boolean',
         ];
     }
 

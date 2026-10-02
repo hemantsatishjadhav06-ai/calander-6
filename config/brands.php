@@ -25,6 +25,7 @@ return [
             ],
             'profile' => [
                 'website_url' => 'https://neopolisinfra.com',
+                'netlify_site_id' => '47e0a5cc-d9d9-428b-a36b-beea806bff6f',
                 'instagram_username' => 'neopolis_infra',
                 'facebook_page_id' => '61595008380228',
                 'facebook_page_url' => 'https://www.facebook.com/profile.php?id=61595008380228',
@@ -52,6 +53,7 @@ return [
             ],
             'profile' => [
                 'website_url' => 'https://morespace.netlify.app/',
+                'netlify_site_id' => '964e086b-1cf2-47f7-8b78-16909d268319',
                 'instagram_username' => 'morespace.ai',
                 'facebook_page_id' => '585141221346435',
                 'facebook_page_url' => 'https://www.facebook.com/585141221346435',

@@ -124,7 +124,7 @@ test('the owner can request review approve the exact version and return it for c
         ->and($blog->fresh()->approved_by)->toBe($owner->id)
         ->and($blog->fresh()->approved_at)->not->toBeNull();
     $this->get(route('blogs.preview', $blog))->assertInertia(fn (Assert $page): Assert => $page->where('blog.status', 'approved')->where('publication.available', false));
-    $this->post('/blogs/'.$blog->id.'/publish', ['revision' => $revision])->assertNotFound();
+    $this->postJson(route('blogs.publish', $blog), ['revision' => $revision])->assertUnprocessable()->assertJsonValidationErrors('publication');
     $this->post(route('blogs.reject', $blog), ['revision' => $revision, 'reason' => 'Please verify the location description.'])->assertRedirect();
     expect($blog->fresh()->approved_revision)->toBeNull()
         ->and($blog->fresh()->rejected_by)->toBe($owner->id);

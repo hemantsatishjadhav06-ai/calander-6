@@ -83,6 +83,7 @@ class BlogDraftService
         return DB::transaction(function () use ($user, $draft, $data, $revision): BlogDraft {
             $workspace = $this->workspace($user, lock: true);
             $current = $this->locked($draft, $workspace);
+            $this->assertNotPublishing($current);
             $this->assertRevision($current, $revision);
             $current->fill(Arr::only($data, self::CONTENT_FIELDS));
             $this->assertUniqueSlug($workspace, $current->slug, $current->id);
@@ -102,6 +103,7 @@ class BlogDraftService
         return DB::transaction(function () use ($user, $draft, $action, $revision, $reason): BlogDraft {
             $workspace = $this->workspace($user, ownerOnly: true, lock: true);
             $current = $this->locked($draft, $workspace);
+            $this->assertNotPublishing($current);
             $this->assertRevision($current, $revision);
             if ($action !== 'request' && $current->review_requested_revision !== $revision) {
                 throw ValidationException::withMessages(['revision' => 'Request review of this version before approving or rejecting it.']);
@@ -152,7 +154,17 @@ class BlogDraftService
             'rejection_reason' => $status === 'rejected' ? $draft->rejection_reason : null,
             'updated_at' => $draft->updated_at->toIso8601String(),
             'can_review' => $workspace->owner_id === $user->id && $user->isOwnerOfWorkspace($workspace->id),
+            'publication_status' => $draft->publication_status,
+            'publication_error' => $draft->publication_error,
+            'published_revision' => $draft->published_revision,
+            'published_url' => $draft->published_url,
+            'published_at' => $draft->published_at?->toIso8601String(),
         ];
+    }
+
+    private function assertNotPublishing(BlogDraft $draft): void
+    {
+        abort_if($draft->publication_status === 'publishing', 409, 'Wait for website publishing to finish before editing or reviewing this article.');
     }
 
     private function locked(BlogDraft $draft, Workspace $workspace): BlogDraft

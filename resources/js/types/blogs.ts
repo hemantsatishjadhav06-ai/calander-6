@@ -4,6 +4,13 @@ export type BlogReviewStatus =
     | 'approved'
     | 'rejected';
 
+export type BlogPublicationStatus =
+    | 'idle'
+    | 'queued'
+    | 'publishing'
+    | 'published'
+    | 'failed';
+
 export type BlogSummary = {
     id: string;
     title: string;
@@ -19,6 +26,11 @@ export type BlogSummary = {
     rejection_reason: string | null;
     updated_at: string;
     can_review: boolean;
+    publication_status?: BlogPublicationStatus;
+    publication_error?: string | null;
+    published_url?: string | null;
+    published_at?: string | null;
+    published_revision?: string | null;
 };
 
 export type BlogDraft = BlogSummary & {

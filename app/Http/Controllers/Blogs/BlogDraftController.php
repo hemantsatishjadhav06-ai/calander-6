@@ -11,6 +11,7 @@ use App\Models\BlogDraft;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Blogs\BlogDraftService;
+use App\Services\Blogs\BlogPublicationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -71,7 +72,14 @@ class BlogDraftController extends Controller
     {
         $drafts->review($request->user(), $blogDraft, 'approve', $request->validated('revision'));
 
-        return to_route('blogs.preview', $blogDraft)->with('success', 'This version is approved. Website publishing is not connected yet.');
+        return to_route('blogs.preview', $blogDraft)->with('success', 'This version is approved and remains private until you publish it.');
+    }
+
+    public function publish(ReviewBlogDraftRequest $request, BlogDraft $blogDraft, BlogPublicationService $publication): RedirectResponse
+    {
+        $publication->request($request->user(), $blogDraft, $request->validated('revision'));
+
+        return to_route('blogs.preview', $blogDraft)->with('success', 'Approved article queued for website publishing.');
     }
 
     public function reject(ReviewBlogDraftRequest $request, BlogDraft $blogDraft, BlogDraftService $drafts): RedirectResponse
@@ -101,10 +109,7 @@ class BlogDraftController extends Controller
     {
         return [
             'brand' => ['name' => $workspace->name, 'website_url' => $destination['website_url']],
-            'publication' => [
-                'available' => false,
-                'reason' => 'Website publishing needs a verified site connection. You can save, preview, and approve private drafts now.',
-            ],
+            'publication' => app(BlogPublicationService::class)->availability($destination, $workspace),
         ];
     }
 }

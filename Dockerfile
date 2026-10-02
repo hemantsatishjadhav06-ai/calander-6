@@ -7,7 +7,7 @@
 ARG SERVERSIDEUP_PHP_VERSION=8.5-frankenphp-trixie
 ARG BUN_VERSION=1.4.2
 # https://www.postgresql.org/support/versioning/
-ARG POSTGRES_VERSION=17
+ARG POSTGRES_VERSION=18
 ARG USER_ID=9999
 ARG GROUP_ID=9999
 # The running app version, set by the release pipeline from the published git
@@ -134,6 +134,14 @@ RUN docker-php-serversideup-set-id www-data ${USER_ID}:${GROUP_ID} \
 RUN install-php-extensions redis gd exif bcmath
 
 # System packages + Bun (needed when SSR is toggled on: inertia:start-ssr --runtime=bun)
+# PostgreSQL's signed repository provides a client matching PostgreSQL 18 on
+# Debian trixie; an older pg_dump cannot back up a newer production database.
+RUN install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsS https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && . /etc/os-release \
+    && printf 'Types: deb\nURIs: https://apt.postgresql.org/pub/repos/apt\nSuites: %s-pgdg\nComponents: main\nSigned-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc\n' \
+        "$VERSION_CODENAME" > /etc/apt/sources.list.d/pgdg.sources
 RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-client-${POSTGRES_VERSION} \
         git \
@@ -198,6 +206,10 @@ COPY --chmod=755 docker/worker-command.sh /usr/local/bin/worker-command.sh
 
 # Entrypoint init scripts (run by the serversideup ENTRYPOINT before the CMD)
 COPY --chmod=755 docker/entrypoint.d/ /etc/entrypoint.d/
+# Prepare fresh root-owned volumes when the host overrides the image's USER,
+# then drop privileges before Laravel initialization and process supervision.
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/sm-manager-entrypoint
+ENTRYPOINT ["/usr/local/bin/sm-manager-entrypoint"]
 
 # Application source
 COPY --chown=www-data:www-data . .

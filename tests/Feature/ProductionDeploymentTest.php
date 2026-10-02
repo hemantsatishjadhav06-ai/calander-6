@@ -97,3 +97,106 @@ test('supervisor allows a publishing job to finish during a deployment', functio
 
     expect((int) ($gracePeriod[1] ?? 0))->toBeGreaterThan((new PublishPostTarget(PostTarget::factory()->make()))->timeout);
 });
+
+function containerEntrypointProcess(string $directory, string $userId, array $environment = []): Process
+{
+    $bin = $directory.'/bin';
+    File::makeDirectory($bin);
+
+    $commands = [
+        'id' => 'printf "%s\\n" "$SM_ENTRYPOINT_TEST_UID"',
+        'chown' => 'if [ "${SM_ENTRYPOINT_TEST_CHOWN_FAILURE:-false}" = "true" ]; then exit 17; fi',
+        'setpriv' => <<<'SH'
+printf '%s\n' "$@" > "$SM_ENTRYPOINT_TEST_DIRECTORY/privilege-arguments"
+while [ "$1" != "--" ]; do shift; done
+shift
+exec "$@"
+SH,
+        'docker-php-serversideup-entrypoint' => <<<'SH'
+printf '%s\n' "$@"
+SH,
+    ];
+
+    foreach ($commands as $name => $command) {
+        $path = $bin.'/'.$name;
+        File::put($path, "#!/bin/sh\nset -eu\n".$command."\n");
+        chmod($path, 0755);
+    }
+
+    return new Process(
+        ['sh', base_path('docker/entrypoint.sh'), 'php', 'argument with spaces', '--flag'],
+        $directory,
+        [
+            'PATH' => $bin.':'.getenv('PATH'),
+            'APP_BASE_DIR' => $directory.'/app',
+            'SM_ENTRYPOINT_TEST_DIRECTORY' => $directory,
+            'SM_ENTRYPOINT_TEST_UID' => $userId,
+            ...$environment,
+        ],
+    );
+}
+
+test('root container startup preserves existing files and drops privileges before initialization', function (): void {
+    $storage = $this->deploymentDirectory.'/app/storage';
+    File::makeDirectory($storage, 0755, true);
+    $key = $storage.'/oauth-private.key';
+    File::put($key, 'private key fixture');
+    chmod($key, 0600);
+
+    $process = containerEntrypointProcess($this->deploymentDirectory, '0');
+    $process->mustRun();
+
+    expect(File::get($key))->toBe('private key fixture')
+        ->and(fileperms($key) & 0777)->toBe(0600)
+        ->and(is_dir($this->deploymentDirectory.'/app/bootstrap/cache'))->toBeTrue()
+        ->and(File::get($this->deploymentDirectory.'/privilege-arguments'))->toBe(
+            "--reuid=www-data\n--regid=www-data\n--init-groups\n--no-new-privs\n--\ndocker-php-serversideup-entrypoint\nphp\nargument with spaces\n--flag\n",
+        )
+        ->and($process->getOutput())->toBe("php\nargument with spaces\n--flag\n");
+});
+
+test('non-root container startup forwards the command without changing volume ownership', function (): void {
+    $process = containerEntrypointProcess($this->deploymentDirectory, '9999');
+    $process->mustRun();
+
+    expect($process->getOutput())->toBe("php\nargument with spaces\n--flag\n")
+        ->and(is_dir($this->deploymentDirectory.'/app'))->toBeFalse()
+        ->and(is_file($this->deploymentDirectory.'/privilege-arguments'))->toBeFalse();
+});
+
+test('root container startup fails before initialization when volume ownership cannot be prepared', function (): void {
+    $process = containerEntrypointProcess($this->deploymentDirectory, '0', [
+        'SM_ENTRYPOINT_TEST_CHOWN_FAILURE' => 'true',
+    ]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(17)
+        ->and($process->getOutput())->toBe('')
+        ->and(is_file($this->deploymentDirectory.'/privilege-arguments'))->toBeFalse();
+});
+
+test('root container startup refuses symlinked writable directories', function (): void {
+    $target = $this->deploymentDirectory.'/preserved';
+    File::makeDirectory($target);
+    File::makeDirectory($this->deploymentDirectory.'/app');
+    symlink($target, $this->deploymentDirectory.'/app/storage');
+
+    $process = containerEntrypointProcess($this->deploymentDirectory, '0');
+    $process->run();
+
+    expect($process->getExitCode())->toBe(1)
+        ->and($process->getErrorOutput())->toContain('must not be symlinks')
+        ->and(is_file($this->deploymentDirectory.'/privilege-arguments'))->toBeFalse();
+});
+
+test('root container startup rejects unsafe application directory settings', function (string $directory): void {
+    $process = containerEntrypointProcess($this->deploymentDirectory, '0', ['APP_BASE_DIR' => $directory]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(1)
+        ->and($process->getErrorOutput())->toContain('APP_BASE_DIR must')
+        ->and(is_file($this->deploymentDirectory.'/privilege-arguments'))->toBeFalse();
+})->with([
+    'filesystem root' => '/',
+    'relative path' => 'relative/path',
+]);

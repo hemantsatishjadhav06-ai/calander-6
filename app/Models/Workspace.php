@@ -72,12 +72,18 @@ class Workspace extends Model
     public function assertApprovalAuthorityMutable(): void
     {
         $current = static::query()->whereKey($this->id)->lockForUpdate()->first();
-        if ($current === null || (! $current->requires_post_approval && ! $this->requires_post_approval)) {
+        if ($current === null) {
+            return;
+        }
+
+        $blogPublishing = BlogDraft::withoutGlobalScopes()->where('workspace_id', $this->id)->where('publication_status', 'publishing')->exists();
+        if (! $current->requires_post_approval && ! $this->requires_post_approval && ! $blogPublishing) {
             return;
         }
 
         abort_if(Post::withoutGlobalScopes()->where('workspace_id', $this->id)->where('status', 'publishing')->exists()
-            || PostTarget::query()->where('status', 'publishing')->whereHas('post', fn (EloquentBuilder $query): EloquentBuilder => $query->withoutGlobalScopes()->where('workspace_id', $this->id))->exists(),
+            || PostTarget::query()->where('status', 'publishing')->whereHas('post', fn (EloquentBuilder $query): EloquentBuilder => $query->withoutGlobalScopes()->where('workspace_id', $this->id))->exists()
+            || $blogPublishing,
             409, 'Wait for publishing to finish before changing the workspace owner or approval policy.');
     }
 
