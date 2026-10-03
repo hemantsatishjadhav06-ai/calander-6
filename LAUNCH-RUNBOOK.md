@@ -363,6 +363,11 @@ Redirect URI:
 
 The app's public policy URLs are `/privacy`, `/terms` and `/data-deletion`
 on that same origin; the last is the data-deletion instructions URL. The
+official Application API saved and read back the production app domain,
+website, privacy policy, terms and contact email on 2026-10-03. OAuth redirect
+allowlisting and the **User Data Deletion → instructions URL** setting still
+require the Meta dashboard; use the GET `/data-deletion` instructions page,
+not a signed-request callback. The
 Instagram accounts must be Professional accounts linked to their matching
 Pages. Standard Access supports testing accounts owned or managed by the
 app's authorized testers; verify the app roles and actual granted permissions
