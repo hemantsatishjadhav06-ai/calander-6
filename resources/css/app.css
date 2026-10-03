@@ -2,7 +2,8 @@
 
 @import 'tw-animate-css';
 
-@import 'shadcn/tailwind.css';
+/* shadcn 4.21.1 styles; upstream MIT license is retained beside the stylesheet. */
+@import './vendor/shadcn/tailwind.css';
 
 @import '@fontsource-variable/noto-sans';
 

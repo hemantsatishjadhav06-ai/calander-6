@@ -17,6 +17,7 @@
   "sortImports": true,
   "sortPackageJson": false,
   "ignorePatterns": [
+    "resources/css/vendor/shadcn/*",
     "resources/js/components/ui/*",
     "resources/views/mail/*"
   ]

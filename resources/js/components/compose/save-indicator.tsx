@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 import type { SaveState } from '@/lib/compose/composer-state';
 import { cn } from '@/lib/utils';
 
@@ -6,6 +8,8 @@ type SaveIndicatorProps = {
     /** Epoch millis of the last successful save, or null when never saved. */
     lastSavedAt: number | null;
 };
+
+const subscribeToHydration = () => () => {};
 
 /**
  * Compact dot + label save status. The conflict resolution UI lives in
@@ -17,7 +21,12 @@ export default function SaveIndicator({
     state,
     lastSavedAt,
 }: SaveIndicatorProps) {
-    const label = formatSaveLabel(state, lastSavedAt);
+    const hydrated = useSyncExternalStore(
+        subscribeToHydration,
+        () => true,
+        () => false,
+    );
+    const label = formatSaveLabel(state, hydrated ? lastSavedAt : null);
 
     return (
         <div
