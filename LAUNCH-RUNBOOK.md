@@ -345,12 +345,42 @@ connected-account callbacks use `/accounts/callback/{provider}`. Meta uses
 with the same provider app. Configure the final domain before registering
 callbacks to avoid repeating provider setup.
 
-Meta credentials and owner consent are still missing. Supply the Meta App ID
-and configure its secret securely in Railway (`FACEBOOK_CLIENT_ID` and
-`FACEBOOK_CLIENT_SECRET`); Facebook and Instagram use the unified Meta
-callback above and Instagram accounts must be linked to the correct Pages.
-Follow the official provider screens and obtain the permissions required for
-each enabled feature. The existing X connection in another workspace is not
+The owner supplied Meta App ID `1109341454940040` on 2026-10-03. It is
+configured in Railway as `FACEBOOK_CLIENT_ID`, along with the production
+callback and confirmed operator contact email. The owner saved
+`FACEBOOK_CLIENT_SECRET` securely in the production service. Meta's official
+app-token endpoint and app-details endpoint both returned HTTP 200 and
+confirmed the app ID and name **SM Manager**. That verifies the app credentials;
+official owner consent for Page and Instagram access is still required.
+Confirm the running deployment loads both credentials after configuration is
+applied. Never save the secret in the repository or chat.
+
+Use Facebook Login for Business and Instagram's **API setup with Facebook
+Login** for this shared connection flow. Register the exact Valid OAuth
+Redirect URI:
+
+`https://sm-manager-production-33df.up.railway.app/accounts/callback/meta`
+
+The app's public policy URLs are `/privacy`, `/terms` and `/data-deletion`
+on that same origin; the last is the data-deletion instructions URL. The
+Instagram accounts must be Professional accounts linked to their matching
+Pages. Standard Access supports testing accounts owned or managed by the
+app's authorized testers; verify the app roles and actual granted permissions
+before requiring review for access to external businesses.
+
+Start consent from `/accounts` in the owner's logged-in browser, separately
+in each brand workspace. Facebook and Instagram reconnect buttons use the
+same `/accounts/connect/meta` Page-selection flow. When direct messaging is
+enabled, its permission request includes `pages_manage_metadata` alongside
+the platform messaging scopes and Page discovery permission. This dependency
+is omitted when direct messaging is disabled. Follow the provider screens
+and verify the grants required for each enabled feature.
+
+Connection alone does not activate the prepared drafts: attach the correct
+connected destinations, choose future schedule times and obtain owner
+dashboard approval. One image draft per brand is prepared for this initial
+test; the remaining text-only Instagram drafts need suitable media before
+they can publish. The existing X connection in another workspace is not
 evidence that these new owner workspaces are connected; reconnect through the
 owner's consent flow without moving another user's credentials. More Space
 also needs an X account created before its consent flow can run.

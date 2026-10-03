@@ -306,8 +306,8 @@ class MetaConnectionController extends Controller
     private function directMessageScopeDeltas(Platform $platform): array
     {
         return match ($platform) {
-            Platform::Instagram => ['instagram_manage_messages'],
-            Platform::Facebook => ['pages_messaging'],
+            Platform::Instagram => ['instagram_manage_messages', 'pages_manage_metadata'],
+            Platform::Facebook => ['pages_messaging', 'pages_manage_metadata'],
             default => [],
         };
     }

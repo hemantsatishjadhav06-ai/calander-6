@@ -65,9 +65,24 @@ describe('reconnectOAuthUrl', () => {
         );
     });
 
-    it('uses the generic OAuth route for other platforms', () => {
-        expect(reconnectOAuthUrl(account({ platform: 'x' }))).toBe(
-            OAuthConnectionController.redirect.url({ platform: 'x' }),
-        );
-    });
+    it.each(['facebook', 'instagram'])(
+        'reconnects %s through the shared Meta Page-selection flow',
+        (platform) => {
+            const url = reconnectOAuthUrl(account({ platform }));
+
+            expect(url).toBe('/accounts/connect/meta');
+            expect(url).not.toBe(
+                OAuthConnectionController.redirect.url({ platform }),
+            );
+        },
+    );
+
+    it.each(['x', 'linkedin', 'threads'])(
+        'keeps the generic OAuth route for %s',
+        (platform) => {
+            expect(reconnectOAuthUrl(account({ platform }))).toBe(
+                OAuthConnectionController.redirect.url({ platform }),
+            );
+        },
+    );
 });

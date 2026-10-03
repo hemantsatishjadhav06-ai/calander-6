@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import BlueskyOAuthController from '@/actions/App/Http/Controllers/ConnectedAccounts/BlueskyOAuthController';
 import ConnectedAccountController from '@/actions/App/Http/Controllers/ConnectedAccounts/ConnectedAccountController';
+import MetaConnectionController from '@/actions/App/Http/Controllers/ConnectedAccounts/MetaConnectionController';
 import OAuthConnectionController from '@/actions/App/Http/Controllers/ConnectedAccounts/OAuthConnectionController';
 import { AccountCard } from '@/components/accounts/account-card';
 import { ConnectButtons } from '@/components/accounts/connect-buttons';
@@ -22,12 +23,16 @@ import { removeById } from '@/lib/optimistic';
 export const ACCOUNT_GRID_CLASS = 'grid grid-cols-1 gap-4 lg:grid-cols-2';
 
 /**
- * Resolve the OAuth redirect URL used to (re)connect an account. Bluesky has a
- * dedicated controller; every other platform shares the generic OAuth route.
+ * Resolve the OAuth redirect URL used to (re)connect an account. Facebook and
+ * Instagram share the Meta Page-selection flow; Bluesky has a dedicated route.
  * A saved custom PDS is replayed as `pds_url` so reconnect targets the original
  * authorization server instead of falling back to the bsky.social default.
  */
 export function reconnectOAuthUrl(account: Account): string {
+    if (account.platform === 'facebook' || account.platform === 'instagram') {
+        return MetaConnectionController.redirect.url();
+    }
+
     if (account.platform !== 'bluesky') {
         return OAuthConnectionController.redirect.url({
             platform: account.platform,
